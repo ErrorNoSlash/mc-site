@@ -177,7 +177,7 @@ document.querySelectorAll(".splash").forEach(function (splash) {
 });
 
 /*phones have no hover: a tap gives the same small effect for a moment*/
-const pressable = ".pill, .nav-logo, .title h1 span, .splash, .address, .lead-cta, .server-row, .slot, .choice, .submit, .mc-button, .mc-close, .mc-entry, .admin-row";
+const pressable = ".pill, .nav-logo, .title h1 span, .splash, .address, .lead-cta, .server-row, .slot, .choice, .submit, .mc-button, .mc-close, .mc-entry, .admin-row, .contact-link, .icon-link";
 document.addEventListener("touchstart", function (event) {
     const target = event.target.closest(pressable);
     if (!target) return;

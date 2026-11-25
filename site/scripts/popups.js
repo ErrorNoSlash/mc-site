@@ -1,8 +1,8 @@
-/*status? / join? open a popup drawn like the game's menu screens: the server list, or the request form*/
+/*ds/, status? and join? open a popup drawn like the game's menu screens: contact links, the server list or the request form*/
 const veil = document.querySelector("#veil");
 const sheet = document.querySelector(".sheet");
 const panels = [...veil.querySelectorAll(".panel")];
-const panelTabs = [...document.querySelectorAll(".nav-tabs a[href='#servers'], .nav-tabs a[href='#join'], .lead-cta")];
+const panelTabs = [...document.querySelectorAll(".nav-tabs a[href='#servers'], .nav-tabs a[href='#join'], .lead-cta, .nav-logo")];
 const requestForm = document.querySelector("#request-form");
 const requestFormHome = requestForm.parentElement;
 let lastClickedTab = null;
@@ -53,9 +53,15 @@ function fillStatusPanel(status) {
         : count + " online" + (names.length ? ": " + names.join(", ") + (count > names.length ? " and " + (count - names.length) + " more" : "") : "");
 }
 
+// which popup a link opens
+function panelFor(tab) {
+    if (tab.classList.contains("nav-logo")) return "contact";
+    return tab.hash === "#join" ? "join" : "status";
+}
+
 /* open and close, like the contact site's who? / links? */
 function showPanel(panelName) {
-    const isPanelName = panelName === "status" || panelName === "join";
+    const isPanelName = panelName === "status" || panelName === "join" || panelName === "contact";
 
     if (isPanelName) {
         panels.forEach(function (panel) {
@@ -72,7 +78,7 @@ function showPanel(panelName) {
     veil.setAttribute("aria-hidden", String(!isPanelName));
     sheet.toggleAttribute("inert", isPanelName);
     panelTabs.forEach(function (tab) {
-        tab.classList.toggle("is-active", tab.hash === (panelName === "join" ? "#join" : panelName === "status" ? "#servers" : ""));
+        tab.classList.toggle("is-active", isPanelName && panelFor(tab) === panelName);
     });
 
     if (panelName === "join") document.querySelector("#name-input").focus();
@@ -91,7 +97,7 @@ panelTabs.forEach(function (tab) {
     tab.addEventListener("click", function (event) {
         event.preventDefault();
         lastClickedTab = tab;
-        showPanel(tab.hash === "#join" ? "join" : "status");
+        showPanel(panelFor(tab));
     });
 });
 

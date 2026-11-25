@@ -32,6 +32,10 @@
     --line-color: #6f6f6f;
 
     --line-width: 0.0625rem;
+
+    /* motion: smooth, with a little spring where something hops, like an item bobbing up */
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-pop: cubic-bezier(0.3, 1.5, 0.5, 1);
     --pad: clamp(0.875rem, 2vw, 1.75rem);
     --font-display: "Pixelify Sans", "Monocraft", ui-monospace, monospace;
     --font-mono: "Monocraft", ui-monospace, Menlo, Consolas, monospace;
@@ -195,7 +199,7 @@ textarea {
     margin-left: 0.25rem;
     vertical-align: text-bottom;
     background: var(--foreground);
-    animation: blink 1.1s steps(1) infinite;
+    animation: blink 1.1s ease-in-out infinite;
 }
 
 /* nav */
@@ -209,7 +213,7 @@ textarea {
         letter-spacing: -0.04em;
         transition: 0.3s;
 
-        &:hover {
+        &:is(:hover, .is-active) {
             background: var(--foreground);
             color: var(--background);
         }
@@ -529,7 +533,7 @@ textarea {
             opacity: 1;
             background: var(--foreground);
             color: var(--background);
-            animation: copied-pop 0.35s cubic-bezier(0.2, 0.8, 0.2, 1.2);
+            animation: copied-pop 0.35s var(--ease-pop);
         }
     }
 }
@@ -894,13 +898,18 @@ textarea {
     visibility: hidden;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.35s, visibility 0s 0.35s;
+    transition: opacity 0.35s var(--ease-out), visibility 0s 0.35s;
 
     &.is-open {
         visibility: visible;
         opacity: 1;
         pointer-events: auto;
-        transition: opacity 0.35s;
+        transition: opacity 0.35s var(--ease-out);
+    }
+
+    /* closing: the window shrinks a little while the veil fades */
+    &:not(.is-open) .panel {
+        transform: scale(0.96);
     }
 }
 
@@ -918,7 +927,8 @@ textarea {
         inset 0.25rem 0.25rem 0 color-mix(in srgb, var(--foreground) 14%, transparent),
         inset -0.25rem -0.25rem 0 color-mix(in srgb, #000 35%, transparent),
         0.5rem 0.5rem 0 color-mix(in srgb, var(--foreground) 22%, transparent);
-    animation: panel-in 0.3s steps(4);
+    animation: panel-in 0.35s var(--ease-pop);
+    transition: transform 0.35s var(--ease-out);
 
     &[hidden] {
         display: none;
@@ -981,6 +991,90 @@ textarea {
     }
 }
 
+/* the small contact popup behind ds/ */
+.panel.is-small {
+    width: min(24rem, 100%);
+}
+
+/* the one big link to the contact site, filling in from the middle like the send button */
+.contact-link {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border: 0.125rem solid var(--foreground);
+    overflow: hidden;
+    z-index: 0;
+    transition: color 0.4s var(--ease-out);
+
+    & b {
+        display: block;
+        font: 800 1.5rem / 1.1 var(--font-display);
+    }
+
+    & small {
+        font-size: 0.75rem;
+        opacity: 0.6;
+    }
+
+    .link-go {
+        font: 700 0.875rem var(--font-mono);
+        white-space: nowrap;
+    }
+
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--foreground);
+        clip-path: circle(0% at 50% 50%);
+        transition: clip-path 0.5s var(--ease-out);
+        z-index: -1;
+    }
+
+    &:is(:hover, :focus-visible, .is-pressed) {
+        color: var(--background);
+
+        &::after {
+            clip-path: circle(100% at 50% 50%);
+        }
+    }
+}
+
+/* the six small links at the bottom: square game buttons with an icon */
+.contact-icons {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding: var(--panel-pad);
+
+    .icon-link {
+        display: grid;
+        place-items: center;
+        aspect-ratio: 1;
+        border: 0.125rem solid var(--foreground);
+        background: var(--surface);
+        box-shadow:
+            inset 0.1875rem 0.1875rem 0 color-mix(in srgb, var(--foreground) 22%, transparent),
+            inset -0.1875rem -0.1875rem 0 color-mix(in srgb, #000 35%, transparent);
+        transition: background 0.2s var(--ease-out), color 0.2s var(--ease-out), transform 0.3s var(--ease-pop);
+
+        &:is(:hover, :focus-visible, .is-pressed) {
+            background: var(--foreground);
+            color: var(--background);
+            transform: translateY(-0.125rem);
+        }
+    }
+
+    & svg {
+        width: 1.25rem;
+        height: 1.25rem;
+        fill: currentColor;
+    }
+}
+
 /* the ✕ in the corner of a popup */
 .mc-close {
     width: 2.25rem;
@@ -990,6 +1084,7 @@ textarea {
     background: var(--surface);
     font: 700 0.875rem / 1 var(--font-pixel);
     cursor: pointer;
+    transition: background 0.2s var(--ease-out), color 0.2s var(--ease-out);
 
     &:is(:hover, :focus-visible) {
         background: var(--foreground);
@@ -1009,6 +1104,7 @@ textarea {
     font: 700 0.875rem / 1 var(--font-pixel);
     text-shadow: 0.125rem 0.125rem 0 color-mix(in srgb, var(--foreground) 20%, transparent);
     cursor: pointer;
+    transition: background 0.2s var(--ease-out), color 0.2s var(--ease-out), box-shadow 0.15s var(--ease-out), transform 0.15s var(--ease-out);
 
     &:is(:hover, :focus-visible) {
         background: var(--foreground);
@@ -1016,8 +1112,10 @@ textarea {
         text-shadow: none;
     }
 
+    /* pressed: the bevel flips and the button sinks a hair, like the game's buttons */
     &:active {
         box-shadow: inset 0.1875rem 0.1875rem 0 color-mix(in srgb, #000 35%, transparent);
+        transform: translateY(0.0625rem);
     }
 }
 
@@ -1042,6 +1140,7 @@ textarea {
     border: 0.125rem solid transparent;
     background: none;
     text-align: left;
+    transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out);
 
     & b {
         display: block;
@@ -1390,7 +1489,7 @@ textarea {
         display: block;
         height: 100%;
         background: currentColor;
-        transition: width 0.8s steps(8);
+        transition: width 0.8s var(--ease-out);
     }
 }
 
@@ -1538,7 +1637,7 @@ textarea {
     background: var(--foreground);
     color: var(--background);
     box-shadow: inset 0 0 0 0.1875rem var(--foreground), inset 0 0 0 0.3125rem var(--background);
-    animation: toast-in 0.45s steps(5);
+    animation: toast-in 0.45s var(--ease-out);
 
     & b {
         display: block;
@@ -1608,7 +1707,7 @@ textarea {
 
 /* the big word: a letter hops up a little */
 .title h1 span {
-    transition: transform 0.2s steps(2);
+    transition: transform 0.3s var(--ease-pop);
 }
 
 /* a server row: a faint tint and the name steps right */
@@ -1616,20 +1715,20 @@ textarea {
     transition: background 0.25s;
 
     .server-name {
-        transition: transform 0.2s steps(2);
+        transition: transform 0.3s var(--ease-out);
     }
 }
 
 /* a hotbar head lifts, like picking it up */
 .slot .head,
 .mc-icon {
-    transition: transform 0.2s steps(2), filter 0.3s;
+    transition: transform 0.3s var(--ease-pop), filter 0.3s;
 }
 
 /* java / bedrock and the jump button nudge */
 .choice span,
 .lead-cta .arrow {
-    transition: transform 0.2s steps(2), background 0.3s, color 0.3s;
+    transition: transform 0.3s var(--ease-pop), background 0.3s, color 0.3s;
 }
 
 /* with a mouse: the effects on hover */
@@ -1697,7 +1796,7 @@ textarea {
 
 /* a new splash line pops in */
 .splash.is-new {
-    animation: splash-new 0.25s steps(3), splash 0.5s 0.25s ease-in-out infinite alternate;
+    animation: splash-new 0.35s var(--ease-pop), splash 0.5s 0.35s ease-in-out infinite alternate;
 }
 
 /* cursor (fine pointers only): the contact site's cursor, drawn like the game's crosshair and block outline.
@@ -1848,11 +1947,11 @@ body.cursor-on-link {
     }
 }
 
-/* panel-in: the popup pops up in four steps, like a game window opening */
+/* panel-in: the popup grows in with a soft spring */
 @keyframes panel-in {
     from {
         opacity: 0;
-        transform: scale(0.9);
+        transform: scale(0.94);
     }
 }
 
