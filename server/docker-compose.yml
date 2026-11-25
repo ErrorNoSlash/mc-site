@@ -1,0 +1,254 @@
+name: minecraft
+
+x-fabric-proxy-env: &fabric-proxy-env
+  VELOCITY_FORWARDING_SECRET: "${VELOCITY_SECRET:?velocity secret required}"
+  FABRIC_PROXY_SECRET: "${VELOCITY_SECRET:?velocity secret required}"
+  MODRINTH_PROJECTS: |
+    fabricproxy-lite
+
+configs:
+  velocity-toml:
+    content: |
+      config-version = "2.9"
+      bind = "0.0.0.0:25565"
+      motd = "<#09add3>DS Network [1.7/26.2]"
+      show-max-players = 20
+      online-mode = true
+      force-key-authentication = true
+      prevent-client-proxy-connections = false
+      player-info-forwarding-mode = "modern"
+      forwarding-secret-file = "forwarding.secret"
+      announce-forge = false
+      kick-existing-players = false
+      enable-player-address-logging = true
+
+      [servers]
+      limbo = "mc-limbo:25565"
+      survival = "mc-survival:25565"
+      survival-old = "mc-survival-old:25565"
+      anarchy = "mc-anarchy:25565"
+      try = ["limbo"]
+
+      [forced-hosts]
+
+      [advanced]
+      compression-threshold = 256
+      compression-level = -1
+      login-ratelimit = 3000
+      connection-timeout = 5000
+      read-timeout = 30000
+      haproxy-protocol = false
+      tcp-fast-open = false
+      bungee-plugin-message-channel = true
+      show-ping-requests = false
+      failover-on-unexpected-server-disconnect = true
+      announce-proxy-commands = true
+      log-command-executions = false
+      log-player-connections = true
+      accepts-transfers = false
+
+      [query]
+      enabled = false
+      port = 25577
+      map = "Velocity"
+      show-plugins = false
+
+      [packet-limiter]
+      interval = 7
+      packets-per-second = -1
+      bytes-per-second = -1
+      decompressed-bytes-per-second = 5242880
+
+      [ping-passthrough]
+      version = false
+      players = false
+      description = false
+      favicon = false
+      modinfo = false
+
+  velocity-forwarding-secret:
+    content: "${VELOCITY_SECRET}"
+
+  limbo-settings-yml:
+    content: |
+      bind:
+        ip: '0.0.0.0'
+        port: 25565
+      maxPlayers: 100
+      ping:
+        description: '{"text": "&9Limbo"}'
+        version: 'Limbo'
+        protocol: -1
+      dimension: THE_END
+      playerList:
+        enable: false
+        username: 'Limbo'
+      headerAndFooter:
+        enable: false
+        header: '{"text": ""}'
+        footer: '{"text": ""}'
+      gameMode: 2
+      secureProfile: false
+      brandName:
+        enable: true
+        content: 'Limbo'
+      joinMessage:
+        enable: false
+        text: '{"text": ""}'
+      bossBar:
+        enable: false
+        text: '{"text": ""}'
+        health: 1.0
+        color: PINK
+        division: SOLID
+      title:
+        enable: false
+        title: '{"text": ""}'
+        subtitle: '{"text": ""}'
+        fadeIn: 10
+        stay: 100
+        fadeOut: 10
+      infoForwarding:
+        type: MODERN
+        secret: '${VELOCITY_SECRET}'
+        tokens: []
+      readTimeout: 30000
+      debugLevel: 2
+      netty:
+        useEpoll: true
+        threads:
+          bossGroup: 1
+          workerGroup: 4
+      traffic:
+        enable: true
+        maxPacketSize: 8192
+        interval: 7.0
+        maxPacketRate: 500.0
+        maxPacketBytesRate: 2048.0
+
+services:
+  velocity:
+    container_name: "Velocity"
+    image: itzg/mc-proxy:java25
+    environment:
+      TYPE: "VELOCITY"
+      MINECRAFT_VERSION: "26.1.2"
+      MODRINTH_PROJECTS: |
+        viaversion
+        viabackwards
+        smartrejoin
+      PLUGINS: |
+        https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/velocity
+        https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/velocity
+    configs:
+      - source: velocity-toml
+        target: /config/velocity.toml
+      - source: velocity-forwarding-secret
+        target: /config/forwarding.secret
+    ports:
+      - "25565:25565/tcp"
+      - "19132:19132/udp"
+    volumes:
+      - /data/minecraft/velocity:/server
+    restart: unless-stopped
+    networks:
+      - mc-network
+
+  mc-limbo:
+    container_name: "MC-limbo"
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: "NANOLIMBO"
+      MEMORY: "256M"
+    configs:
+      - source: limbo-settings-yml
+        target: /data/settings.yml
+    volumes:
+      - /data/minecraft/limbo:/data
+    restart: unless-stopped
+    networks:
+      - mc-network
+    healthcheck:
+      disable: true
+
+  mc-survival:
+    container_name: "MC-survival"
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: "FABRIC"
+      VERSION: "1.21.11"
+      MEMORY: "4G"
+      <<: *fabric-proxy-env
+    volumes:
+      - /data/minecraft/survival:/data
+    restart: unless-stopped
+    networks:
+      - mc-network
+
+  mc-anarchy:
+    container_name: "MC-anarchy"
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: "FABRIC"
+      VERSION: "1.21.11"
+      MEMORY: "2G"
+      <<: *fabric-proxy-env
+    volumes:
+      - /data/minecraft/anarchy:/data
+    restart: unless-stopped
+    networks:
+      - mc-network
+
+  mc-survival-old:
+    container_name: "MC-survival-old"
+    image: itzg/minecraft-server
+    environment:
+      EULA: "TRUE"
+      TYPE: "FABRIC"
+      VERSION: "1.21.11"
+      MEMORY: "2G"
+      <<: *fabric-proxy-env
+    volumes:
+      - /data/minecraft/survival-old:/data
+    restart: unless-stopped
+    networks:
+      - mc-network
+
+  # status + whitelist requests for the website (mc-site repo, api/ folder)
+  whitelist-api:
+    container_name: "Whitelist-API"
+    build: ./mc-site/api
+    environment:
+      ADMIN_TOKEN: "${WHITELIST_ADMIN_TOKEN:?whitelist admin token required}"
+      SITE_URL: "${WHITELIST_SITE_URL:?site url required}"
+      PUBLIC_API_URL: "${WHITELIST_API_URL:?api url required}"
+      # the site, plus the ntfy web app (so its Approve / Deny buttons work in a browser too)
+      ALLOWED_ORIGINS: "${WHITELIST_SITE_URL},${NTFY_PUBLIC_URL:-}"
+      # Nginx Proxy Manager passes the visitor's address in X-Real-IP
+      CLIENT_IP_HEADER: "x-real-ip"
+      # first entry = the proxy everyone joins through; limbo is left out on purpose
+      STATUS_SERVERS: "DS Network=velocity:25565, survival=mc-survival:25565, survival-old=mc-survival-old:25565, anarchy=mc-anarchy:25565"
+      # your own ntfy, straight over the Internal network (no TLS, no public hop)
+      NTFY_URL: "${NTFY_URL:-http://Ntfy}"
+      NTFY_TOPIC: "${NTFY_TOPIC:?ntfy topic required}"
+      NTFY_TOKEN: "${NTFY_TOKEN:-}"
+      NTFY_PRIORITY: "4"
+    volumes:
+      - /data/minecraft/whitelist:/data
+      # the Velocity plugin's folder: the API writes whitelist.txt here, the plugin writes seen.tsv
+      - /data/minecraft/velocity/plugins/ds-whitelist:/plugin
+    restart: unless-stopped
+    networks:
+      - mc-network   # to ping the Minecraft servers
+      - internal     # to reach Ntfy, and so Nginx Proxy Manager can reach the API
+
+networks:
+  mc-network:
+    driver: bridge
+  # the network from your main compose file (Nginx Proxy Manager, Ntfy, ...)
+  internal:
+    name: Internal
+    external: true

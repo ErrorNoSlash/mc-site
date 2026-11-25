@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>DS Network · admin</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="referrer" content="no-referrer">
+    <meta name="theme-color" content="#e4e4e4" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#040507" media="(prefers-color-scheme: dark)">
+
+    <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
+    <link rel="preload" href="fonts/monocraft-regular.woff2" as="font" type="font/woff2" crossorigin>
+
+    <link rel="stylesheet" href="styles/style.css">
+
+    <script src="scripts/config.js" defer></script>
+    <script src="scripts/common.js" defer></script>
+    <script src="scripts/admin.js" defer></script>
+</head>
+
+<body>
+    <main class="sheet">
+
+        <div class="row nav">
+            <a class="cell nav-logo" href="index.html" aria-label="Back to the server page">ds/</a>
+            <div class="cell nav-prompt">dias@mc:~$ /op dias<span class="caret"></span></div>
+            <nav class="cell nav-tabs" aria-label="Admin">
+                <a class="pill" href="index.html">site</a>
+                <button class="pill" type="button" id="logout" hidden>log out</button>
+            </nav>
+        </div>
+
+        <div class="notice" id="notice" role="status" hidden></div>
+
+        <div class="row title compact" data-state="online">
+            <div class="title-label">
+                <span><span class="title-star">*</span> DS NETWORK</span>
+                <span class="title-meta" id="title-meta">[ whitelist ]</span>
+            </div>
+            <div class="echo echo-far" aria-hidden="true">ADMIN</div>
+            <div class="echo echo-near" aria-hidden="true">ADMIN</div>
+            <h1>ADMIN</h1>
+            <p class="splash" data-fixed aria-hidden="true">op only!</p>
+        </div>
+
+        <!-- shown until the token is accepted -->
+        <section class="row" id="login-view">
+            <form class="login" id="login-form">
+                <p>Paste the <b>ADMIN_TOKEN</b> from the server's .env.</p>
+                <label class="field">
+                    <span class="caption">admin token</span>
+                    <input type="password" name="token" autocomplete="current-password" required>
+                </label>
+                <label class="check"><input type="checkbox" name="remember"> remember on this device</label>
+                <button class="submit" type="submit"><span>log in</span><span class="link-go">GO &gt;</span></button>
+                <output class="terminal-output" id="login-output" aria-live="polite"></output>
+            </form>
+        </section>
+
+        <!-- everything below needs the token -->
+        <div id="admin-view" hidden>
+
+            <div class="row stats">
+                <div class="cell stat"><span class="caption">waiting</span><b id="stat-pending">0</b></div>
+                <div class="cell stat"><span class="caption">whitelisted</span><b id="stat-listed">0</b></div>
+                <div class="cell stat"><span class="caption">seen, not listed</span><b id="stat-unlisted">0</b></div>
+                <button class="enforce" type="button" id="enforce" aria-pressed="false">
+                    <span class="caption">whitelist is</span>
+                    <b id="enforce-label">OFF</b>
+                    <span class="caption" id="enforce-hint">anyone can join · click to turn on</span>
+                </button>
+            </div>
+
+            <section class="row admin-block" aria-labelledby="pending-head">
+                <div class="block-head">
+                    <span id="pending-head">dias@mc:~$ /whitelist requests</span>
+                    <span class="block-tools">
+                        <span class="caption" id="ntfy-state"></span>
+                        <button class="pill small" type="button" id="ntfy-test">test</button>
+                    </span>
+                </div>
+                <div id="pending-list"></div>
+            </section>
+
+            <div class="row admin-grid">
+                <section class="admin-block" aria-labelledby="listed-head">
+                    <div class="block-head"><span id="listed-head">dias@mc:~$ /whitelist list</span></div>
+                    <form class="add-form" id="add-form">
+                        <select name="edition" aria-label="Edition">
+                            <option value="java">java</option>
+                            <option value="bedrock">bedrock</option>
+                        </select>
+                        <input type="text" name="name" placeholder="name or gamertag" aria-label="Name or gamertag" autocomplete="off" spellcheck="false" required>
+                        <button class="pill" type="submit">add</button>
+                    </form>
+                    <div id="listed-list"></div>
+                </section>
+
+                <section class="admin-block" aria-labelledby="seen-head">
+                    <div class="block-head">
+                        <span id="seen-head">dias@mc:~$ /seen --not-listed</span>
+                        <button class="pill small" type="button" id="add-all-seen" hidden>add all</button>
+                    </div>
+                    <div id="seen-list"></div>
+                </section>
+            </div>
+
+            <section class="row admin-block" aria-labelledby="message-head">
+                <div class="block-head"><span id="message-head">dias@mc:~$ /kick-message</span></div>
+                <form class="message-editor" id="message-form">
+                    <span class="caption">shown to people who aren't whitelisted · MiniMessage · {name} = their name · {site} = this site</span>
+                    <textarea name="message" spellcheck="false"></textarea>
+                    <div class="actions">
+                        <button class="pill" type="submit">save</button>
+                        <button class="pill" type="button" id="message-reset">use default</button>
+                    </div>
+                </form>
+            </section>
+
+            <details class="row admin-block history" id="history">
+                <summary>dias@mc:~$ /whitelist history (<span id="history-count">0</span>)</summary>
+                <div id="history-list"></div>
+            </details>
+
+        </div>
+
+        <footer class="row site-footer">
+            <div>&copy;<span data-year></span> - Dias Stas</div>
+            <div id="refreshed"></div>
+        </footer>
+
+    </main>
+</body>
+
+</html>

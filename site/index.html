@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>DS Network · Minecraft</title>
+    <meta name="description" content="DS Network, a small whitelisted Minecraft server for Java and Bedrock. See if it's online and ask to join.">
+    <meta name="theme-color" content="#e4e4e4" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#040507" media="(prefers-color-scheme: dark)">
+
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="DS Network · Minecraft">
+    <meta property="og:description" content="A small whitelisted Minecraft server for Java and Bedrock. Ask to join.">
+
+    <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
+    <link rel="preload" href="fonts/monocraft-regular.woff2" as="font" type="font/woff2" crossorigin>
+
+    <link rel="stylesheet" href="styles/style.css">
+
+    <script src="scripts/config.js" defer></script>
+    <script src="scripts/common.js" defer></script>
+    <script src="scripts/status.js" defer></script>
+    <script src="scripts/request.js" defer></script>
+    <script src="scripts/panorama.js" defer></script>
+</head>
+
+<body>
+    <main class="sheet">
+
+        <div class="row nav">
+            <a class="cell nav-logo" href="https://contact.errornoslash.be" data-contact-link aria-label="Contact page">ds/</a>
+            <div class="cell nav-prompt">dias@mc:~$ /list<span class="caret"></span></div>
+            <nav class="cell nav-tabs" aria-label="Sections">
+                <a class="pill" href="#servers">status?</a>
+                <a class="pill is-active" href="#join">join?</a>
+            </nav>
+        </div>
+
+        <div class="row title" data-state="loading">
+            <!-- a blocky world turning slowly behind the word (panorama.js) -->
+            <div class="panorama" aria-hidden="true"></div>
+            <div class="title-label">
+                <span><span class="title-star">*</span> DS NETWORK</span>
+                <span class="title-meta" id="title-meta">[ pinging ]</span>
+            </div>
+            <div class="echo echo-far" aria-hidden="true">PINGING</div>
+            <div class="echo echo-near" aria-hidden="true">PINGING</div>
+            <h1 aria-live="polite">PINGING</h1>
+            <p class="splash" id="splash" aria-hidden="true">now with bedrock!</p>
+        </div>
+
+        <div class="row lead">
+            <div class="cell lead-text">
+                <p>A small Minecraft network.<br>Whitelisted: ask below to get in.</p>
+                <em>/java + bedrock/</em>
+            </div>
+            <div class="cell lead-address">
+                <span class="caption">java address</span>
+                <button class="address" type="button" id="java-address" data-copy="">&nbsp;</button>
+                <span class="caption">bedrock address · port <span id="bedrock-port">19132</span></span>
+                <button class="address" type="button" id="bedrock-address" data-copy="">&nbsp;</button>
+            </div>
+            <a class="cell lead-cta" href="#join">
+                <span class="arrow">&darr;</span>
+                <span class="caption">REQUEST / ACCESS</span>
+            </a>
+        </div>
+
+        <div class="row marquee" aria-hidden="true"><span id="marquee">WHITELISTED * JAVA + BEDROCK * ASK TO JOIN * </span></div>
+
+        <!-- who's online, as a hotbar of player heads -->
+        <div class="row hotbar-row">
+            <div class="cell hotbar-label">
+                <span class="caption">online now</span>
+                <b id="hotbar-count">0</b>
+            </div>
+            <div class="cell hotbar-cell">
+                <ol class="hotbar" id="hotbar" aria-label="Players online"></ol>
+                <span class="caption hotbar-hint">point at a slot<br>to see who</span>
+            </div>
+        </div>
+
+        <div class="row content">
+
+            <section class="servers" id="servers" aria-labelledby="servers-head">
+                <div class="block-head">
+                    <span id="servers-head">dias@mc:~$ /ping</span>
+                    <span class="caption" id="updated">&nbsp;</span>
+                </div>
+                <div class="server-list" id="server-list" aria-live="polite">
+                    <div class="server-row is-loading"><span class="server-number">..</span><span><b class="server-name">pinging</b><small class="server-detail">asking every server how it's doing</small></span><span class="server-state">...</span></div>
+                </div>
+            </section>
+
+            <section class="join" id="join" aria-labelledby="join-head">
+                <div class="block-head">
+                    <span id="join-head">dias@mc:~$ /whitelist add &lt;you&gt;</span>
+                    <button class="text-button" type="button" id="mode-toggle">already asked?</button>
+                </div>
+
+                <form class="request-form" id="request-form" novalidate>
+                    <fieldset class="edition">
+                        <legend class="caption">edition</legend>
+                        <label class="choice"><input type="radio" name="edition" value="java" checked><span>java</span></label>
+                        <label class="choice"><input type="radio" name="edition" value="bedrock"><span>bedrock</span></label>
+                    </fieldset>
+
+                    <label class="field">
+                        <span class="caption" id="name-label">java username</span>
+                        <input name="name" id="name-input" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="17" required>
+                    </label>
+                    <p class="hint" id="name-hint">exactly as it shows in the game</p>
+
+                    <label class="field" id="note-field">
+                        <span class="caption">anything else? (optional)</span>
+                        <textarea name="note" maxlength="300" rows="3" placeholder="who invited you, your discord name..."></textarea>
+                    </label>
+
+                    <!-- left empty by people, filled in by bots -->
+                    <label class="trap" aria-hidden="true">website <input name="website" tabindex="-1" autocomplete="off"></label>
+
+                    <button class="submit" type="submit" id="submit-button">
+                        <span id="submit-label">send request</span><span class="link-go">GO &gt;</span>
+                    </button>
+
+                    <output class="terminal-output" id="form-output" aria-live="polite"></output>
+                </form>
+            </section>
+
+        </div>
+
+        <footer class="row site-footer">
+            <div>&copy;<span data-year></span> - Dias Stas</div>
+            <div><a href="https://contact.errornoslash.be" data-contact-link>contact &gt;</a></div>
+        </footer>
+
+    </main>
+</body>
+
+</html>
