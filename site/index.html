@@ -29,6 +29,7 @@
 
     <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 
+    <!--Google Fonts-->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
@@ -36,6 +37,7 @@
 
     <link rel="stylesheet" href="styles/style.css">
 
+    <!-- JS scripts -->
     <script src="scripts/config.js" defer></script>
     <script src="scripts/common.js" defer></script>
     <script src="scripts/status.js" defer></script>
@@ -56,34 +58,37 @@
             </nav>
         </div>
 
-        <div class="row title" data-state="loading">
-            <!-- a blocky world turning slowly behind the word (panorama.js) -->
+        <!-- title + intro share one background: a blocky world turning slowly (panorama.js) -->
+        <div class="hero">
             <div class="panorama" aria-hidden="true"></div>
-            <div class="title-label">
-                <span><span class="title-star">*</span> DS NETWORK</span>
-                <span class="title-meta" id="title-meta">[ pinging ]</span>
-            </div>
-            <div class="echo echo-far" aria-hidden="true">PINGING</div>
-            <div class="echo echo-near" aria-hidden="true">PINGING</div>
-            <h1 aria-live="polite">PINGING</h1>
-            <p class="splash" id="splash" aria-hidden="true">now with bedrock!</p>
-        </div>
 
-        <div class="row lead">
-            <div class="cell lead-text">
-                <p>A small Minecraft network.<br>Whitelisted: ask below to get in.</p>
-                <em>/java + bedrock/</em>
+            <div class="row title" data-state="loading">
+                <div class="title-label">
+                    <span><span class="title-star">*</span> DS NETWORK</span>
+                    <span class="title-meta" id="title-meta">[ pinging ]</span>
+                </div>
+                <div class="echo echo-far" aria-hidden="true">PINGING</div>
+                <div class="echo echo-near" aria-hidden="true">PINGING</div>
+                <h1 aria-live="polite">PINGING</h1>
+                <p class="splash" id="splash" aria-hidden="true">now with bedrock!</p>
             </div>
-            <div class="cell lead-address">
-                <span class="caption">java address</span>
-                <button class="address" type="button" id="java-address" data-copy="">&nbsp;</button>
-                <span class="caption"><span class="same-only">java + </span>bedrock address · port <span id="bedrock-port">19132</span></span>
-                <button class="address" type="button" id="bedrock-address" data-copy="">&nbsp;</button>
+
+            <div class="row lead">
+                <div class="cell lead-text">
+                    <p>A small Minecraft network.<br>Whitelisted: ask below to get in.</p>
+                    <em>/java + bedrock/</em>
+                </div>
+                <div class="cell lead-address">
+                    <span class="caption">java address</span>
+                    <button class="address" type="button" id="java-address" data-copy="">&nbsp;</button>
+                    <span class="caption"><span class="same-only">java + </span>bedrock address · port <span id="bedrock-port">19132</span></span>
+                    <button class="address" type="button" id="bedrock-address" data-copy="">&nbsp;</button>
+                </div>
+                <a class="cell lead-cta" href="#join">
+                    <span class="arrow">&darr;</span>
+                    <span class="caption">REQUEST / ACCESS</span>
+                </a>
             </div>
-            <a class="cell lead-cta" href="#join">
-                <span class="arrow">&darr;</span>
-                <span class="caption">REQUEST / ACCESS</span>
-            </a>
         </div>
 
         <div class="row marquee" aria-hidden="true"><span id="marquee">WHITELISTED * JAVA + BEDROCK * ASK TO JOIN * </span></div>

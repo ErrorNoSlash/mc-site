@@ -1,9 +1,9 @@
 /*live status: the big word, the server list, the marquee and the tab title*/
-const serverList = document.getElementById("server-list");
+const serverList = document.querySelector("#server-list");
 const titleRow = document.querySelector(".title");
-const titleMeta = document.getElementById("title-meta");
-const updatedLabel = document.getElementById("updated");
-const marquee = document.getElementById("marquee");
+const titleMeta = document.querySelector("#title-meta");
+const updatedLabel = document.querySelector("#updated");
+const marquee = document.querySelector("#marquee");
 
 let lastStatus = null;
 
@@ -14,19 +14,21 @@ function setMarquee(phrase) {
 setMarquee(marquee.textContent);
 
 /*the addresses come from config.js*/
-(function fillAddresses() {
-    const java = document.getElementById("java-address");
-    const bedrock = document.getElementById("bedrock-address");
+function fillAddresses() {
+    const java = document.querySelector("#java-address");
+    const bedrock = document.querySelector("#bedrock-address");
     java.textContent = site.javaAddress;
     java.setAttribute("data-copy", site.javaAddress);
     java.setAttribute("aria-label", "Copy Java address " + site.javaAddress);
     bedrock.textContent = site.bedrockAddress;
-    document.getElementById("bedrock-port").textContent = site.bedrockPort;
+    document.querySelector("#bedrock-port").textContent = site.bedrockPort;
     bedrock.setAttribute("data-copy", site.bedrockAddress);
     bedrock.setAttribute("aria-label", "Copy Bedrock address " + site.bedrockAddress + ", port " + site.bedrockPort);
     // one address for both: phones show it once
     if (site.javaAddress === site.bedrockAddress) java.closest(".lead-address").dataset.same = "";
-})();
+}
+
+fillAddresses();
 
 function playersText(server) {
     if (!server.online || !server.players) return "";
@@ -69,9 +71,9 @@ function serverRow(server, index, isNetwork) {
 
 /*who's online, as a hotbar: one slot per player (named heads first, "?" heads for the
   ones the servers don't name), padded with empty slots. more players than fit: it scrolls sideways*/
-const hotbar = document.getElementById("hotbar");
-const hotbarScroll = document.getElementById("hotbar-scroll");
-const phone = matchMedia("(max-width: 760px)");
+const hotbar = document.querySelector("#hotbar");
+const hotbarScroll = document.querySelector("#hotbar-scroll");
+const phone = window.matchMedia("(max-width: 760px)");
 
 function minimumSlots() {
     return phone.matches ? 9 : 12;
@@ -102,7 +104,7 @@ function renderHotbar(status) {
     hotbar.style.setProperty("--slots", slots.length);
     hotbar.replaceChildren(...slots);
     hotbar.setAttribute("aria-label", players + " players online");
-    document.getElementById("hotbar-count").textContent = count;
+    document.querySelector("#hotbar-count").textContent = count;
 }
 
 /*the name tooltip lives outside the scroll box, so it isn't cut off*/

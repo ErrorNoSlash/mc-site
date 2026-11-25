@@ -1,5 +1,4 @@
 /*shared by both pages: talking to the API, building elements safely, the big title*/
-const site = window.SITE_CONFIG;
 
 /*calls the API and returns the JSON, or throws an Error with the API's own message*/
 async function api(path, options = {}) {
@@ -93,11 +92,11 @@ document.querySelectorAll("[data-contact-link]").forEach(function (element) {
 
 /* ---------- minecraft bits ---------- */
 
-const SVG_NS = "http://www.w3.org/2000/svg";
+const svgNamespace = "http://www.w3.org/2000/svg";
 
 /*a tiny pixel drawing: rects is a list of [x, y, width, height, opacity?]*/
 function pixelSvg(width, height, rects, label) {
-    const svg = document.createElementNS(SVG_NS, "svg");
+    const svg = document.createElementNS(svgNamespace, "svg");
     svg.setAttribute("viewBox", "0 0 " + width + " " + height);
     svg.setAttribute("shape-rendering", "crispEdges");
     svg.setAttribute("class", "pixel");
@@ -108,7 +107,7 @@ function pixelSvg(width, height, rects, label) {
         svg.setAttribute("aria-hidden", "true");
     }
     for (const [x, y, w, hgt, opacity] of rects) {
-        const rect = document.createElementNS(SVG_NS, "rect");
+        const rect = document.createElementNS(svgNamespace, "rect");
         rect.setAttribute("x", x);
         rect.setAttribute("y", y);
         rect.setAttribute("width", w);

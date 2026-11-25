@@ -1,14 +1,14 @@
 /*admin page: approve requests, manage the whitelist, turn it on and off*/
-const TOKEN_KEY = "whitelistAdminToken";
+const tokenStorageKey = "whitelistAdminToken";
 
-const loginView = document.getElementById("login-view");
-const loginForm = document.getElementById("login-form");
-const loginOutput = document.getElementById("login-output");
-const adminView = document.getElementById("admin-view");
-const logoutButton = document.getElementById("logout");
-const notice = document.getElementById("notice");
-const enforceButton = document.getElementById("enforce");
-const messageForm = document.getElementById("message-form");
+const loginView = document.querySelector("#login-view");
+const loginForm = document.querySelector("#login-form");
+const loginOutput = document.querySelector("#login-output");
+const adminView = document.querySelector("#admin-view");
+const logoutButton = document.querySelector("#logout");
+const notice = document.querySelector("#notice");
+const enforceButton = document.querySelector("#enforce");
+const messageForm = document.querySelector("#message-form");
 const messageBox = messageForm.elements.message;
 
 let token = "";
@@ -20,7 +20,7 @@ let noticeTimer = null;
 
 function storedToken() {
     try {
-        return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY) || "";
+        return sessionStorage.getItem(tokenStorageKey) || localStorage.getItem(tokenStorageKey) || "";
     } catch (storageOff) {
         return "";
     }
@@ -28,15 +28,15 @@ function storedToken() {
 
 function storeToken(value, remember) {
     try {
-        sessionStorage.setItem(TOKEN_KEY, value);
-        if (remember) localStorage.setItem(TOKEN_KEY, value);
+        sessionStorage.setItem(tokenStorageKey, value);
+        if (remember) localStorage.setItem(tokenStorageKey, value);
     } catch (storageOff) { }
 }
 
 function forgetToken() {
     try {
-        sessionStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(tokenStorageKey);
+        localStorage.removeItem(tokenStorageKey);
     } catch (storageOff) { }
 }
 
@@ -192,7 +192,7 @@ function historyRow(request) {
 }
 
 function fill(id, rows, emptyText) {
-    document.getElementById(id).replaceChildren(...(rows.length ? rows : [h("div", { class: "empty" }, emptyText)]));
+    document.querySelector("#" + id).replaceChildren(...(rows.length ? rows : [h("div", { class: "empty" }, emptyText)]));
 }
 
 /* ---------- render ---------- */
@@ -204,30 +204,30 @@ function render(data) {
     const unlisted = data.seen.filter(function (entry) { return !entry.listed; });
     const players = [...data.whitelist.players].sort(function (a, b) { return a.name.localeCompare(b.name); });
 
-    document.getElementById("stat-pending").textContent = pending.length;
-    document.getElementById("stat-listed").textContent = players.length;
-    document.getElementById("stat-unlisted").textContent = unlisted.length;
-    document.getElementById("title-meta").textContent = "[ " + pending.length + " waiting ]";
+    document.querySelector("#stat-pending").textContent = pending.length;
+    document.querySelector("#stat-listed").textContent = players.length;
+    document.querySelector("#stat-unlisted").textContent = unlisted.length;
+    document.querySelector("#title-meta").textContent = "[ " + pending.length + " waiting ]";
     document.title = (pending.length ? "(" + pending.length + ") " : "") + "DS Network · admin";
 
     const on = data.whitelist.enforced;
     enforceButton.setAttribute("aria-pressed", String(on));
-    document.getElementById("enforce-label").textContent = on ? "ON" : "OFF";
-    document.getElementById("enforce-hint").textContent = on ? "only listed players · click to turn off" : "anyone can join · click to turn on";
+    document.querySelector("#enforce-label").textContent = on ? "ON" : "OFF";
+    document.querySelector("#enforce-hint").textContent = on ? "only listed players · click to turn off" : "anyone can join · click to turn on";
 
-    document.getElementById("ntfy-state").textContent = data.ntfy ? "ntfy on" : "ntfy off";
-    document.getElementById("ntfy-test").hidden = !data.ntfy;
+    document.querySelector("#ntfy-state").textContent = data.ntfy ? "ntfy on" : "ntfy off";
+    document.querySelector("#ntfy-test").hidden = !data.ntfy;
     fill("pending-list", pending.map(pendingRow), "nothing waiting.");
     fill("listed-list", players.map(listedRow), "nobody yet. add yourself first!");
     fill("seen-list", unlisted.map(seenRow), data.seen.length ? "everyone who joined is listed." : "nobody has joined since the plugin was installed.");
-    document.getElementById("add-all-seen").hidden = unlisted.length < 2;
-    document.getElementById("history-count").textContent = decided.length;
+    document.querySelector("#add-all-seen").hidden = unlisted.length < 2;
+    document.querySelector("#history-count").textContent = decided.length;
     fill("history-list", decided.map(historyRow), "no decisions yet.");
 
     if (!messageDirty && document.activeElement !== messageBox) {
         messageBox.value = data.whitelist.message || data.whitelist.defaultMessage;
     }
-    document.getElementById("refreshed").textContent = "refreshed " + new Date().toLocaleTimeString();
+    document.querySelector("#refreshed").textContent = "refreshed " + new Date().toLocaleTimeString();
 }
 
 async function load() {
@@ -287,7 +287,7 @@ enforceButton.addEventListener("click", function () {
     act(adminApi("/api/admin/settings", { method: "PUT", body: { enforced: turnOn } }), "whitelist " + (turnOn ? "on" : "off"));
 });
 
-document.getElementById("add-form").addEventListener("submit", function (event) {
+document.querySelector("#add-form").addEventListener("submit", function (event) {
     event.preventDefault();
     const form = event.target;
     const name = form.elements.name.value.trim();
@@ -295,13 +295,13 @@ document.getElementById("add-form").addEventListener("submit", function (event) 
         .then(function (ok) { if (ok) form.elements.name.value = ""; });
 });
 
-document.getElementById("add-all-seen").addEventListener("click", async function () {
+document.querySelector("#add-all-seen").addEventListener("click", async function () {
     const unlisted = overview.seen.filter(function (entry) { return !entry.listed; });
     if (!confirm("Whitelist all " + unlisted.length + " players who joined before?")) return;
     act(Promise.all(unlisted.map(addSeen)), unlisted.length + " players whitelisted");
 });
 
-document.getElementById("ntfy-test").addEventListener("click", function () {
+document.querySelector("#ntfy-test").addEventListener("click", function () {
     act(adminApi("/api/admin/test-notification", { method: "POST" }), "test notification sent, check your phone");
 });
 
@@ -314,7 +314,7 @@ messageForm.addEventListener("submit", function (event) {
     act(adminApi("/api/admin/settings", { method: "PUT", body: { message: message } }), "kick message saved");
 });
 
-document.getElementById("message-reset").addEventListener("click", function () {
+document.querySelector("#message-reset").addEventListener("click", function () {
     messageBox.value = overview.whitelist.defaultMessage;
     messageDirty = false;
     act(adminApi("/api/admin/settings", { method: "PUT", body: { message: "" } }), "back to the default message");

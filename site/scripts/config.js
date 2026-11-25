@@ -1,5 +1,5 @@
 /*the only file to edit when something moves*/
-window.SITE_CONFIG = {
+const site = {
     // the whitelist API (must be https, because GitHub Pages is)
     apiBase: "https://mc-api.errornoslash.be",
 
@@ -33,10 +33,8 @@ window.SITE_CONFIG = {
     ]
 };
 
-/*while testing on your own computer: open index.html?api=http://localhost:8080
-  (only works on localhost, so nobody can point the admin page at another server)*/
-(function () {
-    const override = new URLSearchParams(location.search).get("api");
-    const isLocal = ["localhost", "127.0.0.1", ""].includes(location.hostname);
-    if (override && isLocal) window.SITE_CONFIG.apiBase = override.replace(/\/+$/, "");
-})();
+// while testing on your own computer: open index.html?api=http://localhost:8080
+// (only works on localhost, so nobody can point the admin page at another server)
+const apiOverride = new URLSearchParams(location.search).get("api");
+const isLocalhost = ["localhost", "127.0.0.1", ""].includes(location.hostname);
+if (apiOverride && isLocalhost) site.apiBase = apiOverride.replace(/\/+$/, "");

@@ -1,13 +1,13 @@
 /*the whitelist request form, which also checks on an earlier request ("already asked?")*/
-const form = document.getElementById("request-form");
-const nameInput = document.getElementById("name-input");
-const nameLabel = document.getElementById("name-label");
-const nameHint = document.getElementById("name-hint");
-const noteField = document.getElementById("note-field");
-const submitButton = document.getElementById("submit-button");
-const submitLabel = document.getElementById("submit-label");
-const output = document.getElementById("form-output");
-const modeToggle = document.getElementById("mode-toggle");
+const form = document.querySelector("#request-form");
+const nameInput = document.querySelector("#name-input");
+const nameLabel = document.querySelector("#name-label");
+const nameHint = document.querySelector("#name-hint");
+const noteField = document.querySelector("#note-field");
+const submitButton = document.querySelector("#submit-button");
+const submitLabel = document.querySelector("#submit-label");
+const output = document.querySelector("#form-output");
+const modeToggle = document.querySelector("#mode-toggle");
 
 let checking = false; // false: send a request, true: look up an earlier one
 let floodgate = { prefix: ".", replaceSpaces: true };
@@ -41,7 +41,7 @@ function updateLabels() {
 }
 
 /*pixel icons for the toast: a pickaxe for "asked", a tick for "whitelisted"*/
-const TOAST_ICONS = {
+const toastIcons = {
     asked: [[2, 1, 7, 1], [1, 2, 2, 1], [8, 2, 2, 1], [0, 3, 1, 2], [10, 3, 1, 2], [5, 2, 2, 10, 0.75]],
     listed: [[1, 6, 2, 2], [3, 8, 2, 2], [5, 6, 2, 2], [7, 4, 2, 2], [9, 2, 2, 2]]
 };
@@ -49,7 +49,7 @@ const TOAST_ICONS = {
 /*the "advancement made!" toast from the top-right corner of the game*/
 function toast(title, text, icon) {
     return h("span", { class: "toast" },
-        h("span", { class: "toast-icon" }, pixelSvg(12, 12, TOAST_ICONS[icon])),
+        h("span", { class: "toast-icon" }, pixelSvg(12, 12, toastIcons[icon])),
         h("span", null, h("b", null, title), h("span", null, text))
     );
 }
@@ -131,7 +131,7 @@ modeToggle.addEventListener("click", function () {
 });
 
 /*coming back: show how the last request is doing*/
-(async function showRememberedRequest() {
+async function showRememberedRequest() {
     let saved = null;
     try {
         saved = JSON.parse(localStorage.getItem("whitelistRequest") || "null");
@@ -148,7 +148,9 @@ modeToggle.addEventListener("click", function () {
         say(lines, result.status === "approved" ? "toast" : tone,
             result.status === "approved" ? toast("Advancement Made!", "On the list", "listed") : null);
     } catch (error) { }
-})();
+}
+
+showRememberedRequest();
 
 /*the API knows the server's real Floodgate prefix (status.js fires this after every refresh)*/
 document.addEventListener("status", function (event) {
