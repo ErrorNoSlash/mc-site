@@ -1100,26 +1100,59 @@ textarea {
 }
 
 .hotbar-cell {
-    display: flex;
+    /* hotbar in the middle, hint on the right */
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, max-content) minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
     gap: 1rem;
-    padding: 0.75rem var(--pad);
+    padding: 0.35rem var(--pad);
+
+    .hotbar-scroll {
+        grid-column: 2;
+    }
 
     .hotbar-hint {
+        grid-column: 3;
+        justify-self: end;
         opacity: 0.6;
         text-align: right;
     }
 }
 
+/* more players than slots: the hotbar scrolls sideways (wheel, drag or swipe) */
+.hotbar-scroll {
+    min-width: 0;
+    padding: 0.4rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--foreground) transparent;
+}
+
 .hotbar {
-    --slot: clamp(1.9rem, 8.2vw, 4rem);
+    --slot: clamp(1.9rem, 5.2vw, 4rem);
     display: grid;
-    grid-template-columns: repeat(9, var(--slot));
+    grid-template-columns: repeat(var(--slots, 12), var(--slot));
+    width: max-content;
     margin: 0;
     padding: 0;
     border: 0.1875rem solid var(--foreground);
     list-style: none;
+}
+
+/* the item tooltip with the player's name (status.js places it) */
+.hotbar-tip {
+    position: fixed;
+    z-index: 10;
+    padding: 0.25rem 0.5rem;
+    background: var(--foreground);
+    color: var(--background);
+    box-shadow: 0 0 0 0.125rem var(--background), 0 0 0 0.25rem var(--foreground);
+    font: 400 0.75rem / 1.2 var(--font-pixel);
+    white-space: nowrap;
+    transform: translate(-50%, calc(-100% - 0.75rem));
+    pointer-events: none;
 }
 
 .slot {
@@ -1168,22 +1201,6 @@ textarea {
         filter: none;
     }
 
-    /* the item tooltip with the player's name */
-    &[data-name]:is(:hover, :focus-visible)::after {
-        content: attr(data-name);
-        position: absolute;
-        bottom: calc(100% + 0.55rem);
-        left: 50%;
-        z-index: 3;
-        padding: 0.25rem 0.5rem;
-        background: var(--foreground);
-        color: var(--background);
-        box-shadow: 0 0 0 0.125rem var(--background), 0 0 0 0.25rem var(--foreground);
-        font: 400 0.75rem / 1.2 var(--font-pixel);
-        white-space: nowrap;
-        transform: translateX(-50%);
-        pointer-events: none;
-    }
 }
 
 /* the "advancement made!" toast */
@@ -1368,6 +1385,16 @@ textarea {
         --slot: min(3rem, calc((100vw - 4.25rem) / 9));
     }
 
+    .hotbar-cell {
+        grid-template-columns: minmax(0, 1fr);
+        justify-items: center;
+
+        .hotbar-scroll {
+            grid-column: 1;
+            max-width: 100%;
+        }
+    }
+
     /* the form is right below on a phone, so the jump button goes */
     .lead {
         grid-template-columns: minmax(0, 1fr);
@@ -1452,6 +1479,22 @@ body.fit {
             overflow-y: auto;
             overscroll-behavior: contain;
             scrollbar-width: thin;
+        }
+
+        /* a long server list scrolls under its /ping line */
+        &>.servers {
+            overflow: hidden;
+
+            /* size: contained, so a long list never asks for room (it would take it
+               from the title); it fills whatever is left and scrolls */
+            .server-list {
+                flex: 1 1 0;
+                min-height: 0;
+                contain: size;
+                overflow-y: auto;
+                overscroll-behavior: contain;
+                scrollbar-width: thin;
+            }
         }
     }
 }

@@ -28,7 +28,7 @@
     let startY = 0;
     addEventListener("touchstart", function (event) {
         const target = event.target;
-        startX = event.touches.length === 1 && !target.closest("input, textarea") ? event.touches[0].clientX : null;
+        startX = event.touches.length === 1 && !target.closest("input, textarea, .hotbar-scroll") ? event.touches[0].clientX : null;
         startY = event.touches.length === 1 ? event.touches[0].clientY : 0;
     }, { passive: true });
     addEventListener("touchend", function (event) {

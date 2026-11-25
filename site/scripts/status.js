@@ -67,9 +67,21 @@ function serverRow(server, index, isNetwork) {
     );
 }
 
-/*who's online, as a hotbar: one head per player the servers name, "?" heads for the rest*/
+/*who's online, as a hotbar: one slot per player (named heads first, "?" heads for the
+  ones the servers don't name), padded with empty slots. more players than fit: it scrolls sideways*/
+const hotbar = document.getElementById("hotbar");
+const hotbarScroll = document.getElementById("hotbar-scroll");
+const phone = matchMedia("(max-width: 760px)");
+
+function minimumSlots() {
+    return phone.matches ? 9 : 12;
+}
+
+function emptySlots(count) {
+    return Array.from({ length: count }, function () { return h("li", { class: "slot is-empty" }); });
+}
+
 function renderHotbar(status) {
-    const hotbar = document.getElementById("hotbar");
     const count = status.network.online && status.network.players ? status.network.players.online : 0;
     const names = [];
     for (const server of [status.network, ...status.servers]) {
@@ -78,26 +90,53 @@ function renderHotbar(status) {
         }
     }
 
+    const players = Math.max(count, names.length);
     const slots = [];
-    const shown = Math.min(9, Math.max(count, names.length));
-    for (let index = 0; index < 9; index++) {
-        if (index >= shown) {
-            slots.push(h("li", { class: "slot is-empty" }));
-            continue;
-        }
-        const extra = Math.max(count, names.length) - 8;
-        if (index === 8 && extra > 1) {
-            slots.push(h("li", { class: "slot is-more", "data-name": extra + " more" }, "+" + extra));
-            continue;
-        }
+    for (let index = 0; index < players; index++) {
         const name = names[index];
         slots.push(name
             ? h("li", { class: "slot", "data-name": name, tabindex: "0", "aria-label": name }, playerHead(name))
             : h("li", { class: "slot is-hidden", "data-name": "hidden player", "aria-label": "hidden player" }, plainHead()));
     }
+    slots.push(...emptySlots(Math.max(0, minimumSlots() - players)));
+    hotbar.style.setProperty("--slots", slots.length);
     hotbar.replaceChildren(...slots);
+    hotbar.setAttribute("aria-label", players + " players online");
     document.getElementById("hotbar-count").textContent = count;
 }
+
+/*the name tooltip lives outside the scroll box, so it isn't cut off*/
+const hotbarTip = h("div", { class: "hotbar-tip", "aria-hidden": "true" });
+hotbarTip.hidden = true;
+document.body.append(hotbarTip);
+
+function showTip(slot) {
+    if (!slot || !slot.dataset.name) {
+        hotbarTip.hidden = true;
+        return;
+    }
+    const box = slot.getBoundingClientRect();
+    hotbarTip.textContent = slot.dataset.name;
+    hotbarTip.style.left = box.left + box.width / 2 + "px";
+    hotbarTip.style.top = box.top + "px";
+    hotbarTip.hidden = false;
+}
+hotbar.addEventListener("pointerover", function (event) { showTip(event.target.closest(".slot")); });
+hotbar.addEventListener("focusin", function (event) { showTip(event.target.closest(".slot")); });
+hotbar.addEventListener("pointerleave", function () { hotbarTip.hidden = true; });
+hotbar.addEventListener("focusout", function () { hotbarTip.hidden = true; });
+hotbarScroll.addEventListener("scroll", function () { hotbarTip.hidden = true; }, { passive: true });
+
+/*a mouse wheel scrolls the hotbar sideways when it's full*/
+hotbarScroll.addEventListener("wheel", function (event) {
+    if (hotbarScroll.scrollWidth <= hotbarScroll.clientWidth || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+    hotbarScroll.scrollLeft += event.deltaY;
+    event.preventDefault();
+}, { passive: false });
+
+phone.addEventListener("change", function () {
+    if (lastStatus) renderHotbar(lastStatus);
+});
 
 function render(status) {
     const network = status.network;
@@ -127,10 +166,9 @@ function render(status) {
     document.dispatchEvent(new CustomEvent("status", { detail: status }));
 }
 
-/*nine empty slots until the first answer*/
-document.getElementById("hotbar").replaceChildren(...Array.from({ length: 9 }, function () {
-    return h("li", { class: "slot is-empty" });
-}));
+/*empty slots until the first answer*/
+hotbar.style.setProperty("--slots", minimumSlots());
+hotbar.replaceChildren(...emptySlots(minimumSlots()));
 
 function renderUnreachable(error) {
     titleRow.dataset.state = "unknown";
