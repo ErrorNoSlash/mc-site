@@ -101,6 +101,7 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | the colours       | the CSS variables at the top of `site/styles/style.css`             |
 | the servers shown | `STATUS_SERVERS` in the compose file                                |
 | the kick message  | the admin page (MiniMessage; `{name}` and `{site}` are filled in)   |
+| the share image   | `assets/og.py`, then `python3 assets/og.py` (needs Playwright) → `site/images/og-image.png` |
 
 </details>
 
