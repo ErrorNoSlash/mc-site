@@ -11,12 +11,18 @@ repositories {
 }
 
 dependencies {
-    compileOnly("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
-    annotationProcessor("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
+    // Velocity 4 (built for Java 25); the annotation processor writes velocity-plugin.json
+    compileOnly("com.velocitypowered:velocity-api:4.3.2-SNAPSHOT")
+    annotationProcessor("com.velocitypowered:velocity-api:4.3.2-SNAPSHOT")
 }
 
 java {
-    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.release = 25
+    options.encoding = "UTF-8"
 }
 
 tasks.jar {

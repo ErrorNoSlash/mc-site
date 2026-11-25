@@ -241,6 +241,14 @@ services:
       # the Velocity plugin's folder: the API writes whitelist.txt here, the plugin writes seen.tsv
       - /data/minecraft/velocity/plugins/ds-whitelist:/plugin
     restart: unless-stopped
+    # locked down: read-only filesystem (only the two volumes are writable), no extra privileges
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     networks:
       - mc-network   # to ping the Minecraft servers
       - internal     # to reach Ntfy, and so Nginx Proxy Manager can reach the API

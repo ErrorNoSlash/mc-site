@@ -1,0 +1,21 @@
+# Weekly pull requests when the pinned actions, the API's Node image or the plugin's
+# dependencies have a new release. Review and merge them to stay current.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /api
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gradle
+    directory: /velocity-plugin
+    schedule:
+      interval: weekly

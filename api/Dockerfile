@@ -1,4 +1,5 @@
-FROM node:22-alpine
+# Node 26 is the current LTS (supported until Oct 2027); Dependabot proposes newer images
+FROM node:26-alpine
 
 WORKDIR /app
 COPY package.json ./

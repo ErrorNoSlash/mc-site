@@ -1,4 +1,6 @@
-# builds the Velocity plugin; download the jar from the run's "Artifacts"
+# Builds the Velocity plugin, signs a build-provenance attestation for the jar,
+# and uploads it under the run's "Artifacts". Verify a downloaded jar with:
+#   gh attestation verify ds-whitelist-1.0.0.jar -R ErrorNoSlash/mc-site
 name: Build plugin
 
 on:
@@ -6,20 +8,33 @@ on:
     paths: ["velocity-plugin/**", ".github/workflows/plugin.yml"]
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read        # read the repo
+      id-token: write       # sign the attestation
+      attestations: write   # store the attestation
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
-          java-version: "21"
-      - uses: gradle/actions/setup-gradle@v4
+          java-version: "25"
+      - uses: gradle/actions/setup-gradle@7296c772c13d12d9871528814b51fb2143c138ef # v6.4.1
         with:
-          gradle-version: current
-      - run: gradle --project-dir velocity-plugin build
-      - uses: actions/upload-artifact@v4
+          gradle-version: "9.9.2"
+      - run: gradle --project-dir velocity-plugin build --no-daemon
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: velocity-plugin/build/libs/*.jar
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ds-whitelist
           path: velocity-plugin/build/libs/*.jar
+          if-no-files-found: error

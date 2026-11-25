@@ -9,6 +9,6 @@
     "start": "node src/server.js"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=26"
   }
 }
