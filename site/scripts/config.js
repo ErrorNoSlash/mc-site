@@ -4,8 +4,8 @@ window.SITE_CONFIG = {
     apiBase: "https://mc-api.errornoslash.be",
 
     // what players type into Minecraft
-    javaAddress: "play.errornoslash.be",
-    bedrockAddress: "play.errornoslash.be",
+    javaAddress: "mc.errornoslash.be",
+    bedrockAddress: "mc.errornoslash.be",
     bedrockPort: 19132,
 
     // the "ds/" logo and the footer link

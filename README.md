@@ -97,12 +97,12 @@ NPM already passes the visitor's address in `X-Real-IP`, which is what `CLIENT_I
 ### 5. The site
 
 1. Edit `site/scripts/config.js`: the API address, the server addresses players type in, and the splash texts. Player heads come from mc-heads.net; set `headsUrl: ""` to turn them off and show plain pixel heads instead.
-2. Push to GitHub. Under **Settings → Pages**, set *Source* to **GitHub Actions**, then set the custom domain (e.g. `mc.errornoslash.be`). Add a DNS `CNAME` record pointing `mc` at `errornoslash.github.io`.
+2. Push to GitHub. Under **Settings → Pages**, set *Source* to **GitHub Actions**, then set the custom domain `join.errornoslash.be`. Add a DNS `CNAME` record pointing `join` at `errornoslash.github.io`. (`mc.errornoslash.be` stays the Minecraft server address.)
 3. That domain must match `WHITELIST_SITE_URL`, or the browser blocks the API calls (CORS).
 
 ### 6. Turn it on safely
 
-Open `https://mc.errornoslash.be/admin.html` and paste the admin token.
+Open `https://join.errornoslash.be/admin.html` and paste the admin token.
 
 1. **Add yourself** with the add form.
 2. **Seen, not listed** shows everyone who has joined since the plugin went in. Let the regulars log in once, then use **add all**, or add them one by one.

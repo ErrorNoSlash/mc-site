@@ -56,7 +56,7 @@ export function checkConfig() {
         problems.push("ADMIN_TOKEN must be set and at least 24 characters (try: openssl rand -hex 32)");
     }
     if (config.allowedOrigins.length === 0) {
-        problems.push("ALLOWED_ORIGINS must list the site's origin, e.g. https://mc.errornoslash.be");
+        problems.push("ALLOWED_ORIGINS must list the site's origin, e.g. https://join.errornoslash.be");
     }
     if (config.servers.length === 0) {
         problems.push("STATUS_SERVERS must list at least the proxy, e.g. DS Network=velocity:25565");
