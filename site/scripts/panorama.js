@@ -11,7 +11,7 @@
     holder.append(canvas);
     const context = canvas.getContext("2d");
 
-    const PIXEL = innerWidth < 760 ? 3 : 4;   // css pixels per panorama pixel
+    let PIXEL = 4;                    // css pixels per panorama pixel, see pixelSize()
     const VISIBLE_FOV = 1.9;          // how wide the visible part of the view is (radians)
     const TURN_SECONDS = 200;         // one full turn
     const STRENGTH = 0.62;            // how far the brightest block goes towards the text colour
@@ -237,10 +237,21 @@
         night = matchMedia("(prefers-color-scheme: dark)").matches;
     }
 
+    /* 4 css px per panorama pixel at the designed 16 px text size (3 on phones), scaled with the
+       page so Windows display scaling doesn't change the look, then rounded to whole device
+       pixels so the blocks stay sharp at 125 % / 150 % too */
+    function pixelSize() {
+        const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+        const css = (innerWidth < 760 ? 3 : 4) * root / 16;
+        const ratio = devicePixelRatio || 1;
+        return Math.max(1, Math.round(css * ratio)) / ratio;
+    }
+
     /* renders the whole 360° strip, a chunk of columns at a time, starting where the view starts */
     function render() {
         const thisJob = ++job;
         readColors();
+        PIXEL = pixelSize();
 
         const box = holder.parentElement.getBoundingClientRect();
         const rows = Math.max(20, Math.ceil(box.height / PIXEL));

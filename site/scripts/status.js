@@ -24,6 +24,8 @@ setMarquee(marquee.textContent);
     document.getElementById("bedrock-port").textContent = site.bedrockPort;
     bedrock.setAttribute("data-copy", site.bedrockAddress);
     bedrock.setAttribute("aria-label", "Copy Bedrock address " + site.bedrockAddress + ", port " + site.bedrockPort);
+    // one address for both: phones show it once
+    if (site.javaAddress === site.bedrockAddress) java.closest(".lead-address").dataset.same = "";
 })();
 
 function playersText(server) {

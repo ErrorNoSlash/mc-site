@@ -50,9 +50,9 @@
         </div>
 
         <!-- shown until the token is accepted -->
-        <section class="row" id="login-view">
+        <section class="row grow" id="login-view">
             <form class="login" id="login-form">
-                <p>Paste the <b>ADMIN_TOKEN</b> from the server's .env.</p>
+                <p>Paste your admin token (<b>WHITELIST_ADMIN_TOKEN</b> in secrets.yaml).</p>
                 <label class="field">
                     <span class="caption">admin token</span>
                     <input type="password" name="token" autocomplete="current-password" required>
@@ -88,7 +88,7 @@
                 <div id="pending-list"></div>
             </section>
 
-            <div class="row admin-grid">
+            <div class="row admin-grid grow">
                 <section class="admin-block" aria-labelledby="listed-head">
                     <div class="block-head"><span id="listed-head">dias@mc:~$ /whitelist list</span></div>
                     <form class="add-form" id="add-form">

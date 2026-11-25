@@ -41,9 +41,10 @@
     <script src="scripts/status.js" defer></script>
     <script src="scripts/request.js" defer></script>
     <script src="scripts/panorama.js" defer></script>
+    <script src="scripts/pages.js" defer></script>
 </head>
 
-<body>
+<body class="fit" data-page="status">
     <main class="sheet">
 
         <div class="row nav">
@@ -76,7 +77,7 @@
             <div class="cell lead-address">
                 <span class="caption">java address</span>
                 <button class="address" type="button" id="java-address" data-copy="">&nbsp;</button>
-                <span class="caption">bedrock address · port <span id="bedrock-port">19132</span></span>
+                <span class="caption"><span class="same-only">java + </span>bedrock address · port <span id="bedrock-port">19132</span></span>
                 <button class="address" type="button" id="bedrock-address" data-copy="">&nbsp;</button>
             </div>
             <a class="cell lead-cta" href="#join">
@@ -99,7 +100,7 @@
             </div>
         </div>
 
-        <div class="row content">
+        <div class="row content grow">
 
             <section class="servers" id="servers" aria-labelledby="servers-head">
                 <div class="block-head">
@@ -132,7 +133,7 @@
 
                     <label class="field" id="note-field">
                         <span class="caption">anything else? (optional)</span>
-                        <textarea name="note" maxlength="300" rows="3" placeholder="who invited you, your discord name..."></textarea>
+                        <textarea name="note" maxlength="300" rows="2" placeholder="who invited you, your discord name..."></textarea>
                     </label>
 
                     <!-- left empty by people, filled in by bots -->
