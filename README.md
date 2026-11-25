@@ -60,12 +60,13 @@ cp ds-whitelist-1.0.0.jar /data/minecraft/velocity/plugins/
 gh attestation verify ds-whitelist-1.0.0.jar -R ErrorNoSlash/mc-site   # optional: proves it was built here
 ```
 
-**3. The API.** Clone this repo next to your Minecraft `docker-compose.yml` as `mc-site/`. Copy the `whitelist-api` service and the `internal` network from [`server/docker-compose.yml`](server/docker-compose.yml), and the lines from [`server/.env.example`](server/.env.example) into your `.env`. Make the admin token with `openssl rand -hex 32`.
+**3. The API.** Clone this repo next to your Minecraft `docker-compose.yml` as `mc-site/`, and copy the `whitelist-api` service and the `internal` network from [`server/docker-compose.yml`](server/docker-compose.yml). Secrets live in the sops-encrypted `secrets.yaml` of the NixOS config, like `VELOCITY_SECRET`; the stack is started with `sops exec-env` (the `mc-up` alias). Add the admin token without it ever showing on screen:
 
 ```bash
-docker compose up -d --build whitelist-api
-docker compose restart velocity
-docker compose logs whitelist-api velocity | grep -i whitelist   # → "Whitelist loaded: 0 players, NOT enforced"
+sops set ~/nixos-config/secrets.yaml '["WHITELIST_ADMIN_TOKEN"]' "\"$(head -c 32 /dev/urandom | sha256sum | cut -d' ' -f1)\""
+mc-up
+env -C ~/Docker/stacks/minecraft sops exec-env ~/nixos-config/secrets.yaml 'docker compose restart velocity'
+docker logs Velocity 2>&1 | grep -i whitelist   # → "Whitelist loaded: 0 players, NOT enforced"
 ```
 
 **4. HTTPS.** In Nginx Proxy Manager, add a Proxy Host from `mc-api.errornoslash.be` to `http://Whitelist-API:8080`, with a Let's Encrypt certificate and **Force SSL** on.
@@ -75,13 +76,13 @@ docker compose logs whitelist-api velocity | grep -i whitelist   # → "Whitelis
 ```bash
 docker exec -it Ntfy ntfy user add mc-whitelist
 docker exec -it Ntfy ntfy access mc-whitelist mc-whitelist write-only
-docker exec -it Ntfy ntfy token add mc-whitelist                     # tk_…  → NTFY_TOKEN in .env
+docker exec -it Ntfy ntfy token add mc-whitelist                     # tk_…  → NTFY_TOKEN in secrets.yaml
 docker exec -it Ntfy ntfy access YOUR_USER mc-whitelist read-only    # so your phone may subscribe
 ```
 
 Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin page. If it fails, the admin page says why: `ENOTFOUND` means the API isn't on the `Internal` network, and `401/403` means the token or its access is wrong.
 
-**6. Turn it on.** Open [`join.errornoslash.be/admin.html`](https://join.errornoslash.be/admin.html), paste the token, add yourself, let the regulars join once, press **add all**, then switch **OFF** to **ON**.
+**6. Turn it on.** Open [`join.errornoslash.be/admin.html`](https://join.errornoslash.be/admin.html), paste the token (`sops -d --extract '["WHITELIST_ADMIN_TOKEN"]' ~/nixos-config/secrets.yaml`), add yourself, let the regulars join once, press **add all**, then switch **OFF** to **ON**.
 
 **Deploy.** The site is served with GitHub Pages: **Settings → Pages → Source: GitHub Actions**, custom domain `join.errornoslash.be`, plus a DNS `CNAME` record (DNS only) pointing `join` at `errornoslash.github.io`. Every push to `site/` deploys it.
 
@@ -172,7 +173,7 @@ Data lives in `/data/minecraft/whitelist/` (`requests.json`, `whitelist.json`). 
 ├── site/                 # GitHub Pages: index.html, admin.html, scripts, styles, fonts
 ├── api/                  # the whitelist API (Node 26, no dependencies) + Dockerfile
 ├── velocity-plugin/      # the DS Whitelist plugin (Velocity 4, Java 25)
-├── server/               # your Minecraft compose with the API added, and .env.example
+├── server/               # your Minecraft compose with the API added
 ├── assets/               # this README's SVGs, build.py, and its inputs in src/
 └── .github/              # deploy + plugin workflows, Dependabot
 ```
