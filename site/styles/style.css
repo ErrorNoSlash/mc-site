@@ -300,8 +300,8 @@ textarea {
         &>span {
             padding: 0 0.35em;
             background: color-mix(in srgb, var(--background) 25%, transparent);
-            -webkit-backdrop-filter: blur(0.12rem);
-            backdrop-filter: blur(0.12rem);
+            -webkit-backdrop-filter: blur(0.2rem);
+            backdrop-filter: blur(0.2rem);
         }
     }
 
@@ -421,8 +421,8 @@ textarea {
     /* the intro and the addresses sit on frosted glass so they stay readable */
     .lead :is(.lead-text, .lead-address) {
         background: color-mix(in srgb, var(--background) 40%, transparent);
-        -webkit-backdrop-filter: blur(0.15rem);
-        backdrop-filter: blur(0.15rem);
+        -webkit-backdrop-filter: blur(0.25rem);
+        backdrop-filter: blur(0.25rem);
     }
 }
 
@@ -492,24 +492,45 @@ textarea {
     overflow-wrap: anywhere;
     cursor: copy;
 
+    /* the small "copy" chip after the address */
     &::after {
         content: "copy";
+        display: inline-block;
         margin-left: 0.5rem;
-        font: 700 0.625rem var(--font-mono);
+        padding: 0.15rem 0.4rem;
+        border: var(--line-width) solid currentColor;
+        font: 700 0.625rem / 1 var(--font-mono);
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        vertical-align: 0.3em;
+        vertical-align: 0.35em;
         opacity: 0.45;
-        transition: opacity 0.3s;
+        transition: opacity 0.3s, background 0.3s, color 0.3s;
     }
 
-    &:hover::after {
-        opacity: 1;
+    /* pointing at it: the address gets a pixel underline and the chip fills in */
+    &:is(:hover, :focus-visible) {
+        text-decoration: underline dashed 0.125rem;
+        text-underline-offset: 0.25em;
+
+        &::after {
+            opacity: 1;
+            background: var(--foreground);
+            color: var(--background);
+        }
     }
 
-    &.is-copied::after {
-        content: "copied";
-        opacity: 1;
+    /* copied: the chip says so with a tick and pops, the address blinks once */
+    &.is-copied {
+        text-decoration: none;
+        animation: copied-flash 0.6s steps(2);
+
+        &::after {
+            content: "\2713  copied!";
+            opacity: 1;
+            background: var(--foreground);
+            color: var(--background);
+            animation: copied-pop 0.3s steps(3);
+        }
     }
 }
 
@@ -855,6 +876,223 @@ textarea {
     & a {
         text-decoration: underline;
         text-underline-offset: 0.2em;
+    }
+}
+
+/* popups: a blurred veil + a panel drawn like the game's menu screens (status? / join?) */
+.veil {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    padding: clamp(0.75rem, 3vw, 2rem);
+    background: color-mix(in srgb, var(--background) 50%, transparent);
+    -webkit-backdrop-filter: blur(1rem);
+    backdrop-filter: blur(1rem);
+    /* pointer-events off keeps the hidden buttons from being tapped */
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s, visibility 0s 0.35s;
+
+    &.is-open {
+        visibility: visible;
+        opacity: 1;
+        pointer-events: auto;
+        transition: opacity 0.35s;
+    }
+}
+
+/* the window: square, a thick outline and the raised bevel of a game window */
+.panel {
+    display: flex;
+    flex-direction: column;
+    width: min(38rem, 100%);
+    max-height: 100%;
+    border: 0.1875rem solid var(--foreground);
+    background: var(--background);
+    box-shadow:
+        inset 0.25rem 0.25rem 0 color-mix(in srgb, var(--foreground) 14%, transparent),
+        inset -0.25rem -0.25rem 0 color-mix(in srgb, #000 35%, transparent),
+        0.5rem 0.5rem 0 color-mix(in srgb, var(--foreground) 22%, transparent);
+    animation: panel-in 0.3s steps(4);
+
+    &[hidden] {
+        display: none;
+    }
+
+    /* the screen title, centered with the game's text shadow */
+    .panel-head {
+        position: relative;
+        padding: 1rem 3.5rem 0.75rem;
+        text-align: center;
+
+        & h2 {
+            margin: 0;
+            font: 700 clamp(1.1rem, 3vw, 1.4rem) / 1.2 var(--font-pixel);
+            text-shadow: 0.125rem 0.125rem 0 color-mix(in srgb, var(--foreground) 25%, transparent);
+        }
+    }
+
+    /* the middle part scrolls if it doesn't fit */
+    .panel-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        padding: 0 1rem;
+    }
+
+    /* the form keeps its own padding inside the popup */
+    #panel-form .request-form {
+        padding: 0.25rem 0 0.5rem;
+    }
+
+    .panel-players {
+        margin: 0.75rem 0 0;
+        font-size: 0.75rem;
+        opacity: 0.7;
+        text-align: center;
+    }
+
+    /* the button row at the bottom, like Join Server / Refresh / Done */
+    .panel-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 1rem;
+    }
+}
+
+/* the ✕ in the corner of a popup */
+.mc-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 0.125rem solid var(--foreground);
+    background: var(--surface);
+    font: 700 0.875rem / 1 var(--font-pixel);
+    cursor: pointer;
+
+    &:is(:hover, :focus-visible) {
+        background: var(--foreground);
+        color: var(--background);
+    }
+}
+
+/* a game menu button: flat face, light top-left edge, dark bottom-right edge, inverted when pointed at */
+.mc-button {
+    flex: 1 1 9rem;
+    max-width: 14rem;
+    padding: 0.6rem 1rem 0.7rem;
+    border: 0.125rem solid var(--foreground);
+    background: var(--surface);
+    box-shadow:
+        inset 0.1875rem 0.1875rem 0 color-mix(in srgb, var(--foreground) 22%, transparent),
+        inset -0.1875rem -0.1875rem 0 color-mix(in srgb, #000 35%, transparent);
+    font: 700 0.875rem / 1 var(--font-pixel);
+    text-shadow: 0.125rem 0.125rem 0 color-mix(in srgb, var(--foreground) 20%, transparent);
+    cursor: pointer;
+
+    &:is(:hover, :focus-visible) {
+        background: var(--foreground);
+        color: var(--background);
+        text-shadow: none;
+    }
+
+    &:active {
+        box-shadow: inset 0.1875rem 0.1875rem 0 color-mix(in srgb, #000 35%, transparent);
+    }
+}
+
+/* the server list of the multiplayer screen: a sunken box with one entry per server */
+.mc-list {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.375rem;
+    border: 0.125rem solid var(--foreground);
+    background: color-mix(in srgb, var(--foreground) 6%, var(--background));
+    box-shadow: inset 0.1875rem 0.1875rem 0 color-mix(in srgb, #000 30%, transparent);
+}
+
+/* one server: icon, name with a grey line under it, players and ping bars */
+.mc-entry {
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    border: 0.125rem solid transparent;
+    background: none;
+    text-align: left;
+
+    & b {
+        display: block;
+        font: 700 1rem / 1.2 var(--font-pixel);
+    }
+
+    & small {
+        display: block;
+        overflow: hidden;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        opacity: 0.6;
+    }
+
+    /* pointing at an entry outlines it, like selecting it in the game */
+    &:is(:hover, :focus-visible) {
+        border-color: var(--foreground);
+        outline: none;
+    }
+
+    &.is-offline :is(b, .mc-icon) {
+        opacity: 0.45;
+    }
+
+    /* the proxy: click to copy its address */
+    &.is-network {
+        cursor: copy;
+
+        &.is-copied small::after {
+            content: "\2713  copied!";
+            margin-left: 0.5rem;
+            padding: 0 0.35rem;
+            background: var(--foreground);
+            color: var(--background);
+            font-weight: 700;
+        }
+
+        &.is-copied small {
+            opacity: 1;
+        }
+    }
+}
+
+/* the server icon: a little grass block */
+.mc-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+}
+
+/* players and ping bars on the right of an entry */
+.mc-entry-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font: 700 0.875rem var(--font-pixel);
+    white-space: nowrap;
+
+    .ping-bars {
+        width: 1.125rem;
+        height: 1.25rem;
     }
 }
 
@@ -1334,6 +1572,197 @@ textarea {
     filter: none;
 }
 
+/* small hover effects (mouse) and the same on a tap (phones, common.js adds is-pressed for a moment) */
+
+/* things that fill in when pointed at also fill in when tapped */
+:is(.pill:not(:disabled), .nav-logo, .mc-button, .mc-close).is-pressed {
+    background: var(--foreground);
+    color: var(--background);
+}
+
+/* the send button fills in on a tap */
+.submit.is-pressed {
+    color: var(--background);
+
+    &::after {
+        clip-path: circle(100% at 50% 50%);
+    }
+}
+
+/* the copy chip fills in on a tap */
+.address.is-pressed::after {
+    opacity: 1;
+    background: var(--foreground);
+    color: var(--background);
+}
+
+/* the big word: a letter hops up a little */
+.title h1 span {
+    transition: transform 0.2s steps(2);
+}
+
+/* a server row: a faint tint and the name steps right */
+.server-row {
+    transition: background 0.25s;
+
+    .server-name {
+        transition: transform 0.2s steps(2);
+    }
+}
+
+/* a hotbar head lifts, like picking it up */
+.slot .head,
+.mc-icon {
+    transition: transform 0.2s steps(2), filter 0.3s;
+}
+
+/* java / bedrock and the jump button nudge */
+.choice span,
+.lead-cta .arrow {
+    transition: transform 0.2s steps(2), background 0.3s, color 0.3s;
+}
+
+/* with a mouse: the effects on hover */
+@media (hover: hover) and (pointer: fine) {
+    .title h1 span:hover {
+        transform: translateY(-0.05em);
+    }
+
+    .server-row:not(.is-network):hover {
+        background: color-mix(in srgb, var(--foreground) 6%, transparent);
+    }
+
+    .server-row:hover .server-name {
+        transform: translateX(0.35rem);
+    }
+
+    .slot:hover .head,
+    .mc-entry:hover .mc-icon {
+        transform: translateY(-0.125rem);
+    }
+
+    .choice:hover span {
+        transform: translateY(-0.125rem);
+    }
+
+    .lead-cta:hover .arrow {
+        transform: translateY(0.25rem);
+    }
+
+    /* the marquee holds still while you read it */
+    .marquee:hover span {
+        animation-play-state: paused;
+    }
+}
+
+/* on a phone: the same effects on a tap */
+.title h1 span.is-pressed {
+    transform: translateY(-0.05em);
+}
+
+/* a tapped server row: tint + name step */
+.server-row.is-pressed {
+    background: color-mix(in srgb, var(--foreground) 6%, transparent);
+
+    .server-name {
+        transform: translateX(0.35rem);
+    }
+}
+
+/* a tapped head, icon or edition lifts */
+:is(.slot, .mc-entry).is-pressed :is(.head, .mc-icon),
+.choice.is-pressed span {
+    transform: translateY(-0.125rem);
+}
+
+/* a tapped server in the popup gets its outline */
+.mc-entry.is-pressed {
+    border-color: var(--foreground);
+}
+
+/* the jump arrow nudges down on a tap */
+.lead-cta.is-pressed .arrow {
+    transform: translateY(0.25rem);
+}
+
+/* a new splash line pops in */
+.splash.is-new {
+    animation: splash-new 0.25s steps(3), splash 0.5s 0.25s ease-in-out infinite alternate;
+}
+
+/* cursor (fine pointers only): the contact site's cursor, drawn like the game's crosshair and block outline */
+.cursor-dot,
+.cursor-outline {
+    display: none;
+    pointer-events: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 99;
+    /* white with "difference": the cursor turns black on white parts of the page and white on dark parts */
+    mix-blend-mode: difference;
+    will-change: transform;
+    transition: opacity 0.3s;
+}
+
+/* the crosshair from the middle of the game screen; the negative margin centers it on the pointer */
+.cursor-dot {
+    width: 1rem;
+    height: 1rem;
+    margin: -0.5rem 0 0 -0.5rem;
+    background:
+        linear-gradient(#fff, #fff) center / 100% 0.125rem no-repeat,
+        linear-gradient(#fff, #fff) center / 0.125rem 100% no-repeat;
+}
+
+/* the block outline that trails behind it (cursor.js also makes it bigger over a link and smaller on a click) */
+.cursor-outline {
+    width: 1.875rem;
+    height: 1.875rem;
+    margin: -0.9375rem 0 0 -0.9375rem;
+    border: 0.125rem solid #fff;
+    transition: background-color 0.25s, opacity 0.3s;
+}
+
+/* over a link or button (cursor.js adds cursor-on-link): the outline fills in and, with the blend mode,
+   inverts whatever is under it, while the crosshair fades out. it is clear at a glance what you can click */
+body.cursor-on-link {
+
+    .cursor-outline {
+        background-color: #fff;
+    }
+
+    .cursor-dot {
+        opacity: 0;
+    }
+}
+
+/* mouse only: hide the real cursor once the custom one has appeared */
+@media (hover: hover) and (pointer: fine) {
+
+    body.cursor-visible,
+    body.cursor-visible * {
+        cursor: none !important;
+    }
+
+    body.cursor-visible {
+
+        .cursor-dot,
+        .cursor-outline {
+            display: block;
+        }
+    }
+
+    /* the mouse has left the window: the cursor fades out */
+    body.cursor-away {
+
+        .cursor-dot,
+        .cursor-outline {
+            opacity: 0;
+        }
+    }
+}
+
 /* animations */
 
 /* blink: fades the caret in and out */
@@ -1383,6 +1812,35 @@ textarea {
     from {
         opacity: 0;
         transform: translateX(2rem);
+    }
+}
+
+/* splash-new: a fresh splash line grows in */
+@keyframes splash-new {
+    from {
+        transform: rotate(-11deg) scale(0.7);
+    }
+}
+
+/* copied-pop: the copied chip grows in for a moment */
+@keyframes copied-pop {
+    from {
+        transform: scale(0.6);
+    }
+}
+
+/* copied-flash: the copied address blinks once */
+@keyframes copied-flash {
+    50% {
+        opacity: 0.4;
+    }
+}
+
+/* panel-in: the popup pops up in four steps, like a game window opening */
+@keyframes panel-in {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
     }
 }
 
@@ -1519,7 +1977,7 @@ textarea {
 
 /* one screen, no page scrolling (the main page only: body.fit).
    desktop: everything fits the window and the big title gives up height first.
-   phones: two screens, status and join, switched with the nav pills or a sideways swipe (pages.js) */
+   phones: only the status; status? and join? open popups everywhere (popups.js) */
 .same-only {
     display: none;
 }
@@ -1548,7 +2006,7 @@ body.fit {
         display: grid;
         grid-template-rows: minmax(var(--title-min), var(--title-max)) auto;
         flex: 0 1000 auto;
-        /* never smaller than the smallest title plus the intro row (pages.js measures it) */
+        /* never smaller than the smallest title plus the intro row (popups.js measures it) */
         min-height: calc(var(--title-min) + var(--lead-height, 8rem));
     }
 
@@ -1596,6 +2054,7 @@ body.fit {
     }
 }
 
+/* small laptops and tablets: sized by the window height only */
 @media (min-width: 761px) and (max-width: 1199px) {
     html:has(body.fit) {
         font-size: clamp(11px, 100dvh / 70, 16px);
@@ -1626,7 +2085,7 @@ body.fit {
     }
 }
 
-/* two screens on phones (and short landscape screens) */
+/* phones (and short landscape screens) */
 @media (max-width: 760px), (max-width: 980px) and (max-height: 600px) {
     html:has(body.fit) {
         font-size: clamp(11.5px, 100dvh / 50, 16px);
@@ -1722,18 +2181,15 @@ body.fit {
         }
     }
 
-    body.fit[data-page="status"] :is(.lead-text, .join) {
-        display: none;
-    }
-
-    body.fit[data-page="join"] :is(.lead-address, .marquee, .hotbar-row, .servers) {
+    /* phones show the status; the intro and the form are in the join? popup */
+    body.fit :is(.lead-text, .join) {
         display: none;
     }
 }
 
 /* landscape phones: no room for the extras, the title and the list come first */
 @media (max-width: 980px) and (max-height: 600px) {
-    body.fit[data-page="status"] :is(.marquee, .hotbar-row) {
+    body.fit :is(.marquee, .hotbar-row) {
         display: none;
     }
 }

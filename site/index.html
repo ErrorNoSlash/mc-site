@@ -40,13 +40,18 @@
     <!-- JS scripts -->
     <script src="scripts/config.js" defer></script>
     <script src="scripts/common.js" defer></script>
+    <script src="scripts/cursor.js" defer></script>
     <script src="scripts/status.js" defer></script>
     <script src="scripts/request.js" defer></script>
     <script src="scripts/panorama.js" defer></script>
-    <script src="scripts/pages.js" defer></script>
+    <script src="scripts/popups.js" defer></script>
 </head>
 
-<body class="fit" data-page="status">
+<body class="fit">
+    <!-- the cursor: a crosshair + a block outline (cursor.js, mouse only) -->
+    <div class="cursor-dot" data-cursor-dot></div>
+    <div class="cursor-outline" data-cursor-outline></div>
+
     <main class="sheet">
 
         <div class="row nav">
@@ -54,7 +59,7 @@
             <div class="cell nav-prompt">dias@mc:~$ /list<span class="caret"></span></div>
             <nav class="cell nav-tabs" aria-label="Sections">
                 <a class="pill" href="#servers">status?</a>
-                <a class="pill is-active" href="#join">join?</a>
+                <a class="pill" href="#join">join?</a>
             </nav>
         </div>
 
@@ -160,6 +165,39 @@
         </footer>
 
     </main>
+
+    <!-- status? / join? popups, drawn like the game's menu screens (popups.js) -->
+    <div class="veil" id="veil" aria-hidden="true">
+        <section class="panel" id="panel-status" role="dialog" aria-modal="true" aria-labelledby="panel-status-title" hidden>
+            <div class="panel-head">
+                <h2 id="panel-status-title">Play Multiplayer</h2>
+                <button class="mc-close" type="button" data-close aria-label="Close">&#10005;</button>
+            </div>
+            <div class="panel-body">
+                <div class="mc-list" id="panel-servers"></div>
+                <p class="panel-players" id="panel-players"></p>
+            </div>
+            <div class="panel-buttons">
+                <button class="mc-button" type="button" data-panel="join">Join Server</button>
+                <button class="mc-button" type="button" id="panel-refresh">Refresh</button>
+                <button class="mc-button" type="button" data-close>Done</button>
+            </div>
+        </section>
+
+        <section class="panel" id="panel-join" role="dialog" aria-modal="true" aria-labelledby="panel-join-title" hidden>
+            <div class="panel-head">
+                <h2 id="panel-join-title">Ask To Join</h2>
+                <button class="mc-close" type="button" data-close aria-label="Close">&#10005;</button>
+            </div>
+            <!-- the page's own request form moves in here while the popup is open -->
+            <div class="panel-body" id="panel-form"></div>
+            <div class="panel-buttons">
+                <button class="mc-button" type="button" data-panel="status">Server List</button>
+                <button class="mc-button" type="button" id="panel-check">Already Asked?</button>
+                <button class="mc-button" type="button" data-close>Done</button>
+            </div>
+        </section>
+    </div>
 </body>
 
 </html>

@@ -77,7 +77,7 @@ document.addEventListener("click", function (event) {
     const text = button.getAttribute("data-copy");
     const done = function () {
         button.classList.add("is-copied");
-        setTimeout(function () { button.classList.remove("is-copied"); }, 1400);
+        setTimeout(function () { button.classList.remove("is-copied"); }, 2000);
     };
     if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () { });
 });
@@ -90,7 +90,7 @@ document.querySelectorAll("[data-contact-link]").forEach(function (element) {
     element.href = site.contactUrl;
 });
 
-/* ---------- minecraft bits ---------- */
+/* minecraft bits */
 
 const svgNamespace = "http://www.w3.org/2000/svg";
 
@@ -169,5 +169,18 @@ document.querySelectorAll(".splash").forEach(function (splash) {
     splash.addEventListener("click", function () {
         index = (index + 1) % lines.length;
         splash.textContent = lines[index];
+        // restart the little pop
+        splash.classList.remove("is-new");
+        void splash.offsetWidth;
+        splash.classList.add("is-new");
     });
 });
+
+/*phones have no hover: a tap gives the same small effect for a moment*/
+const pressable = ".pill, .nav-logo, .title h1 span, .splash, .address, .lead-cta, .server-row, .slot, .choice, .submit, .mc-button, .mc-close, .mc-entry, .admin-row";
+document.addEventListener("touchstart", function (event) {
+    const target = event.target.closest(pressable);
+    if (!target) return;
+    target.classList.add("is-pressed");
+    setTimeout(function () { target.classList.remove("is-pressed"); }, 450);
+}, { passive: true });

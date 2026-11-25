@@ -16,7 +16,7 @@ let overview = null;
 let messageDirty = false;
 let noticeTimer = null;
 
-/* ---------- token ---------- */
+/* token */
 
 function storedToken() {
     try {
@@ -79,7 +79,7 @@ async function act(promise, success) {
     return ok;
 }
 
-/* ---------- rows ---------- */
+/* rows */
 
 /*head + text, like a player in the tab list*/
 function who(entry, ...children) {
@@ -195,7 +195,7 @@ function fill(id, rows, emptyText) {
     document.querySelector("#" + id).replaceChildren(...(rows.length ? rows : [h("div", { class: "empty" }, emptyText)]));
 }
 
-/* ---------- render ---------- */
+/* render */
 
 function render(data) {
     overview = data;
@@ -248,7 +248,7 @@ async function load() {
     }
 }
 
-/* ---------- events ---------- */
+/* events */
 
 loginForm.addEventListener("submit", async function (event) {
     event.preventDefault();
@@ -320,7 +320,7 @@ document.querySelector("#message-reset").addEventListener("click", function () {
     act(adminApi("/api/admin/settings", { method: "PUT", body: { message: "" } }), "back to the default message");
 });
 
-/* ---------- start ---------- */
+/* start */
 
 setTitleWord("ADMIN");
 token = storedToken();
