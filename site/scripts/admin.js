@@ -250,8 +250,8 @@ async function load() {
 
 /* events */
 
-loginForm.addEventListener("submit", async function (event) {
-    event.preventDefault();
+loginForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
     token = loginForm.elements.token.value.trim();
     loginOutput.dataset.tone = "wait";
     loginOutput.replaceChildren(h("span", null, "> checking..."));
@@ -287,9 +287,9 @@ enforceButton.addEventListener("click", function () {
     act(adminApi("/api/admin/settings", { method: "PUT", body: { enforced: turnOn } }), "whitelist " + (turnOn ? "on" : "off"));
 });
 
-document.querySelector("#add-form").addEventListener("submit", function (event) {
-    event.preventDefault();
-    const form = event.target;
+document.querySelector("#add-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    const form = e.target;
     const name = form.elements.name.value.trim();
     act(adminApi("/api/admin/players", { method: "POST", body: { edition: form.elements.edition.value, name: name } }), name + " added")
         .then(function (ok) { if (ok) form.elements.name.value = ""; });
@@ -307,8 +307,8 @@ document.querySelector("#ntfy-test").addEventListener("click", function () {
 
 messageBox.addEventListener("input", function () { messageDirty = true; });
 
-messageForm.addEventListener("submit", function (event) {
-    event.preventDefault();
+messageForm.addEventListener("submit", function (e) {
+    e.preventDefault();
     const message = messageBox.value.trim() === overview.whitelist.defaultMessage ? "" : messageBox.value;
     messageDirty = false;
     act(adminApi("/api/admin/settings", { method: "PUT", body: { message: message } }), "kick message saved");

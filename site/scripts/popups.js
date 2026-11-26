@@ -75,6 +75,9 @@ function showPanel(panelName) {
     if (panelName === "status") fillStatusPanel(lastStatus);
 
     veil.classList.toggle("is-open", isPanelName);
+    // nothing behind a popup moves while it is open, so no work is spent on a page nobody can see
+    document.body.classList.toggle("popup-open", isPanelName);
+    panorama.classList.toggle("is-paused", isPanelName || !panoramaOnScreen);
     veil.setAttribute("aria-hidden", String(!isPanelName));
     sheet.toggleAttribute("inert", isPanelName);
     panelTabs.forEach(function (tab) {
@@ -94,16 +97,16 @@ function closePanel() {
 }
 
 panelTabs.forEach(function (tab) {
-    tab.addEventListener("click", function (event) {
-        event.preventDefault();
+    tab.addEventListener("click", function (e) {
+        e.preventDefault();
         lastClickedTab = tab;
         showPanel(panelFor(tab));
     });
 });
 
-veil.addEventListener("click", function (event) {
-    if (event.target === veil || event.target.closest("[data-close]")) closePanel();
-    const switchTo = event.target.closest("[data-panel]");
+veil.addEventListener("click", function (e) {
+    if (e.target === veil || e.target.closest("[data-close]")) closePanel();
+    const switchTo = e.target.closest("[data-panel]");
     if (switchTo) showPanel(switchTo.dataset.panel);
 });
 
@@ -118,12 +121,12 @@ panelCheck.addEventListener("click", function () {
 });
 
 // the popup follows the live status while it is open
-document.addEventListener("status", function (event) {
-    if (!document.querySelector("#panel-status").hidden) fillStatusPanel(event.detail);
+document.addEventListener("status", function (e) {
+    if (!document.querySelector("#panel-status").hidden) fillStatusPanel(e.detail);
 });
 
-window.addEventListener("keydown", function (event) {
-    if (event.key === "Escape" && veil.classList.contains("is-open")) closePanel();
+window.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && veil.classList.contains("is-open")) closePanel();
 });
 
 if (location.hash === "#join") showPanel("join");

@@ -71,8 +71,8 @@ function setTitleWord(word, label) {
 }
 
 /*copy buttons: <button data-copy="text">*/
-document.addEventListener("click", function (event) {
-    const button = event.target.closest("[data-copy]");
+document.addEventListener("click", function (e) {
+    const button = e.target.closest("[data-copy]");
     if (!button) return;
     const text = button.getAttribute("data-copy");
     const done = function () {
@@ -178,8 +178,8 @@ document.querySelectorAll(".splash").forEach(function (splash) {
 
 /*phones have no hover: a tap gives the same small effect for a moment*/
 const pressable = ".pill, .nav-logo, .title h1 span, .splash, .address, .lead-cta, .server-row, .slot, .choice, .submit, .mc-button, .mc-close, .mc-entry, .admin-row, .contact-link, .icon-link";
-document.addEventListener("touchstart", function (event) {
-    const target = event.target.closest(pressable);
+document.addEventListener("touchstart", function (e) {
+    const target = e.target.closest(pressable);
     if (!target) return;
     target.classList.add("is-pressed");
     setTimeout(function () { target.classList.remove("is-pressed"); }, 450);

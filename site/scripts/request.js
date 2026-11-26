@@ -82,8 +82,8 @@ function remember(result) {
     } catch (storageOff) { }
 }
 
-form.addEventListener("submit", async function (event) {
-    event.preventDefault();
+form.addEventListener("submit", async function (e) {
+    e.preventDefault();
     const name = nameInput.value.trim();
     if (!name) {
         say(["type your " + (edition() === "java" ? "username" : "gamertag") + " first."], "error");
@@ -153,8 +153,8 @@ async function showRememberedRequest() {
 showRememberedRequest();
 
 /*the API knows the server's real Floodgate prefix (status.js fires this after every refresh)*/
-document.addEventListener("status", function (event) {
-    if (event.detail.floodgate) floodgate = event.detail.floodgate;
+document.addEventListener("status", function (e) {
+    if (e.detail.floodgate) floodgate = e.detail.floodgate;
     updateLabels();
 });
 

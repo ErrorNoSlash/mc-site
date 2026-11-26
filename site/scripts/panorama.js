@@ -330,9 +330,12 @@ window.addEventListener("resize", scheduleRedraw);
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawPanorama);
 
 // the turning itself is a CSS animation; pause it when the row is off screen
+// it stops turning when scrolled away or behind a popup
+let panoramaOnScreen = true;
 if ("IntersectionObserver" in window) {
     new IntersectionObserver(function (entries) {
-        panorama.classList.toggle("is-paused", !entries[0].isIntersecting);
+        panoramaOnScreen = entries[0].isIntersecting;
+        panorama.classList.toggle("is-paused", !panoramaOnScreen || document.body.classList.contains("popup-open"));
     }).observe(panorama.parentElement);
 }
 panorama.style.setProperty("--panorama-turn", turnSeconds + "s");

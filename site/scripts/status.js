@@ -123,17 +123,17 @@ function showTip(slot) {
     hotbarTip.style.top = box.top + "px";
     hotbarTip.hidden = false;
 }
-hotbar.addEventListener("pointerover", function (event) { showTip(event.target.closest(".slot")); });
-hotbar.addEventListener("focusin", function (event) { showTip(event.target.closest(".slot")); });
+hotbar.addEventListener("pointerover", function (e) { showTip(e.target.closest(".slot")); });
+hotbar.addEventListener("focusin", function (e) { showTip(e.target.closest(".slot")); });
 hotbar.addEventListener("pointerleave", function () { hotbarTip.hidden = true; });
 hotbar.addEventListener("focusout", function () { hotbarTip.hidden = true; });
 hotbarScroll.addEventListener("scroll", function () { hotbarTip.hidden = true; }, { passive: true });
 
 /*a mouse wheel scrolls the hotbar sideways when it's full*/
-hotbarScroll.addEventListener("wheel", function (event) {
-    if (hotbarScroll.scrollWidth <= hotbarScroll.clientWidth || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
-    hotbarScroll.scrollLeft += event.deltaY;
-    event.preventDefault();
+hotbarScroll.addEventListener("wheel", function (e) {
+    if (hotbarScroll.scrollWidth <= hotbarScroll.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    hotbarScroll.scrollLeft += e.deltaY;
+    e.preventDefault();
 }, { passive: false });
 
 phone.addEventListener("change", function () {

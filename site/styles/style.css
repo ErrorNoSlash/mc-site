@@ -806,10 +806,15 @@ textarea {
     &::after {
         content: "";
         position: absolute;
-        inset: 0;
+        top: 50%;
+        left: 50%;
+        width: 150%;
+        min-height: 150%;
+        aspect-ratio: 1;
+        border-radius: 50%;
         background: var(--foreground);
-        clip-path: circle(0% at 50% 50%);
-        transition: clip-path 0.6s;
+        transform: translate(-50%, -50%) scale(0);
+        transition: transform 0.6s;
         z-index: -1;
     }
 
@@ -817,7 +822,7 @@ textarea {
         color: var(--background);
 
         &::after {
-            clip-path: circle(100% at 50% 50%);
+            transform: translate(-50%, -50%) scale(1);
         }
     }
 
@@ -888,7 +893,7 @@ textarea {
     }
 }
 
-/* popups: a blurred veil + a panel drawn like the game's menu screens (status? / join?) */
+/* popups: a dark veil + a panel drawn like the game's menu screens (ds/ / status? / join?) */
 .veil {
     position: fixed;
     inset: 0;
@@ -896,9 +901,11 @@ textarea {
     display: grid;
     place-items: center;
     padding: clamp(0.75rem, 3vw, 2rem);
-    background: color-mix(in srgb, var(--background) 50%, transparent);
-    -webkit-backdrop-filter: blur(1rem);
-    backdrop-filter: blur(1rem);
+    /* no live blur here: blurring the whole window was redone on every frame and lagged badly on
+       Windows. a dark tint with a faint pixel checker, like the game's menu background, costs nothing */
+    background:
+        repeating-conic-gradient(color-mix(in srgb, var(--foreground) 5%, transparent) 0 25%, transparent 0 50%) 0 0 / 0.5rem 0.5rem,
+        color-mix(in srgb, var(--background) 82%, transparent);
     /* pointer-events off keeps the hidden buttons from being tapped */
     visibility: hidden;
     opacity: 0;
@@ -916,6 +923,12 @@ textarea {
     &:not(.is-open) .panel {
         transform: scale(0.96);
     }
+}
+
+/* while a popup is open nothing behind it moves (panorama, marquee, splash, cursors): no work is spent
+   on a page nobody can see */
+body.popup-open .sheet :is(*, *::before, *::after) {
+    animation-play-state: paused !important;
 }
 
 /* the window: square, a thick outline and the raised bevel of a game window */
@@ -1032,10 +1045,15 @@ textarea {
     &::after {
         content: "";
         position: absolute;
-        inset: 0;
+        top: 50%;
+        left: 50%;
+        width: 150%;
+        min-height: 150%;
+        aspect-ratio: 1;
+        border-radius: 50%;
         background: var(--foreground);
-        clip-path: circle(0% at 50% 50%);
-        transition: clip-path 0.5s var(--ease-out);
+        transform: translate(-50%, -50%) scale(0);
+        transition: transform 0.5s var(--ease-out);
         z-index: -1;
     }
 
@@ -1043,7 +1061,7 @@ textarea {
         color: var(--background);
 
         &::after {
-            clip-path: circle(100% at 50% 50%);
+            transform: translate(-50%, -50%) scale(1);
         }
     }
 }
@@ -1607,10 +1625,6 @@ textarea {
         opacity: 0.6;
     }
 
-    &.is-more {
-        font: 700 0.75rem var(--font-pixel);
-    }
-
     /* pointing at a slot selects it, like scrolling the hotbar */
     &:is(:hover, :focus-visible)::before {
         content: "";
@@ -1699,7 +1713,7 @@ textarea {
     color: var(--background);
 
     &::after {
-        clip-path: circle(100% at 50% 50%);
+        transform: translate(-50%, -50%) scale(1);
     }
 }
 
@@ -1814,8 +1828,11 @@ textarea {
     top: 0;
     left: 0;
     z-index: 99;
-    /* white with "difference": the cursor turns black on white parts of the page and white on dark parts */
-    mix-blend-mode: difference;
+    /* inverts what is under it: the cursor is black on white parts of the page and white on dark parts.
+       a filter on its own few pixels, not a blend mode: blending made the browser redraw the whole page on every frame.
+       the masks below give it its shape */
+    -webkit-backdrop-filter: invert(1);
+    backdrop-filter: invert(1);
     will-change: transform;
     transition: opacity 0.3s;
 }
@@ -1825,26 +1842,46 @@ textarea {
     width: 16px;
     height: 16px;
     margin: -8px 0 0 -8px;
-    background:
-        linear-gradient(#fff, #fff) center / 100% 2px no-repeat,
-        linear-gradient(#fff, #fff) center / 2px 100% no-repeat;
+    -webkit-mask:
+        linear-gradient(#000, #000) center / 100% 2px no-repeat,
+        linear-gradient(#000, #000) center / 2px 100% no-repeat;
+    mask:
+        linear-gradient(#000, #000) center / 100% 2px no-repeat,
+        linear-gradient(#000, #000) center / 2px 100% no-repeat;
 }
 
-/* the block outline that trails behind it (cursor.js also makes it bigger over a link and smaller on a click) */
+/* how thick the edge of the block outline is, animated when it fills in */
+@property --cursor-edge {
+    syntax: "<length-percentage>";
+    inherits: false;
+    initial-value: 2px;
+}
+
+/* the block outline that trails behind it (cursor.js also makes it bigger over a link and smaller on a click).
+   four strips along the edges: only they invert */
 .cursor-outline {
     width: 30px;
     height: 30px;
     margin: -15px 0 0 -15px;
-    border: 2px solid #fff;
-    transition: background-color 0.25s, opacity 0.3s;
+    -webkit-mask:
+        linear-gradient(#000, #000) top / 100% var(--cursor-edge) no-repeat,
+        linear-gradient(#000, #000) bottom / 100% var(--cursor-edge) no-repeat,
+        linear-gradient(#000, #000) left / var(--cursor-edge) 100% no-repeat,
+        linear-gradient(#000, #000) right / var(--cursor-edge) 100% no-repeat;
+    mask:
+        linear-gradient(#000, #000) top / 100% var(--cursor-edge) no-repeat,
+        linear-gradient(#000, #000) bottom / 100% var(--cursor-edge) no-repeat,
+        linear-gradient(#000, #000) left / var(--cursor-edge) 100% no-repeat,
+        linear-gradient(#000, #000) right / var(--cursor-edge) 100% no-repeat;
+    transition: --cursor-edge 0.25s, opacity 0.3s;
 }
 
-/* over a link or button (cursor.js adds cursor-on-link): the outline fills in and, with the blend mode,
-   inverts whatever is under it, while the crosshair fades out. it is clear at a glance what you can click */
+/* over a link or button (cursor.js adds cursor-on-link): the outline fills in and inverts everything
+   under it, while the crosshair fades out. it is clear at a glance what you can click */
 body.cursor-on-link {
 
     .cursor-outline {
-        background-color: #fff;
+        --cursor-edge: 50%;
     }
 
     .cursor-dot {
