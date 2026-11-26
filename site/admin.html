@@ -45,7 +45,8 @@
 
         <div class="notice" id="notice" role="status" hidden></div>
 
-        <div class="row title compact" data-state="online">
+        <!-- the big title, only on the login screen: once logged in it shrinks into the numbers row -->
+        <div class="row title compact" id="login-title" data-state="online">
             <div class="title-label">
                 <span><span class="title-star">*</span> DS NETWORK</span>
                 <span class="title-meta" id="title-meta">[ whitelist ]</span>
@@ -73,67 +74,84 @@
         <!-- everything below needs the token -->
         <div id="admin-view" hidden>
 
+            <!-- the title, the numbers and the switch in one row -->
             <div class="row stats">
+                <div class="cell stat stat-title">
+                    <span class="caption">* ds network</span>
+                    <span class="stat-word"><b>ADMIN</b><span class="sticker">op only!</span></span>
+                </div>
                 <div class="cell stat"><span class="caption">waiting</span><b id="stat-pending">0</b></div>
                 <div class="cell stat"><span class="caption">whitelisted</span><b id="stat-listed">0</b></div>
                 <div class="cell stat"><span class="caption">seen, not listed</span><b id="stat-unlisted">0</b></div>
                 <button class="enforce" type="button" id="enforce" aria-pressed="false">
                     <span class="caption">whitelist is</span>
-                    <b id="enforce-label">OFF</b>
+                    <span class="enforce-state"><b id="enforce-label">OFF</b><span class="switch" aria-hidden="true"></span></span>
                     <span class="caption" id="enforce-hint">anyone can join · click to turn on</span>
                 </button>
             </div>
 
             <section class="row admin-block" aria-labelledby="pending-head">
+                <!-- one line when nothing is waiting, a big card per request when something is -->
                 <div class="block-head">
                     <span id="pending-head">dias@mc:~$ /whitelist requests</span>
+                    <span class="pending-empty" id="pending-empty">nothing waiting · new requests ping your phone and desktop</span>
                     <span class="block-tools">
                         <span class="caption" id="ntfy-state"></span>
                         <button class="pill small" type="button" id="ntfy-test">test</button>
                     </span>
                 </div>
-                <div id="pending-list"></div>
+                <div class="request-cards" id="pending-list"></div>
             </section>
 
             <div class="row admin-grid grow">
                 <section class="admin-block" aria-labelledby="listed-head">
-                    <div class="block-head"><span id="listed-head">dias@mc:~$ /whitelist list</span></div>
+                    <div class="block-head"><span id="listed-head">dias@mc:~$ /whitelist list</span><span class="caption" id="listed-count"></span></div>
                     <form class="add-form" id="add-form">
                         <select name="edition" aria-label="Edition">
                             <option value="java">java</option>
                             <option value="bedrock">bedrock</option>
                         </select>
                         <input type="text" name="name" placeholder="name or gamertag" aria-label="Name or gamertag" autocomplete="off" spellcheck="false" required>
-                        <button class="pill" type="submit">add</button>
+                        <button class="pill is-main" type="submit">add</button>
                     </form>
                     <div id="listed-list"></div>
                 </section>
 
-                <section class="admin-block" aria-labelledby="seen-head">
-                    <div class="block-head">
-                        <span id="seen-head">dias@mc:~$ /seen --not-listed</span>
-                        <button class="pill small" type="button" id="add-all-seen" hidden>add all</button>
-                    </div>
-                    <div id="seen-list"></div>
-                </section>
+                <!-- the right column: who joined without being listed, then everything that changed -->
+                <div class="admin-side">
+                    <section class="admin-block" aria-labelledby="seen-head">
+                        <div class="block-head">
+                            <span id="seen-head">dias@mc:~$ /seen --not-listed</span>
+                            <button class="pill small" type="button" id="add-all-seen" hidden>add all</button>
+                        </div>
+                        <div id="seen-list"></div>
+                    </section>
+
+                    <section class="admin-block history" aria-labelledby="history-head">
+                        <div class="block-head"><span id="history-head">dias@mc:~$ /whitelist history</span></div>
+                        <ol class="history-list" id="history-list"></ol>
+                    </section>
+                </div>
             </div>
 
+            <!-- the kick message: the editor on the left, what a turned-away player sees on the right -->
             <section class="row admin-block" aria-labelledby="message-head">
                 <div class="block-head"><span id="message-head">dias@mc:~$ /kick-message</span></div>
-                <form class="message-editor" id="message-form">
-                    <span class="caption">shown to people who aren't whitelisted · MiniMessage · {name} = their name · {site} = this site</span>
-                    <textarea name="message" spellcheck="false"></textarea>
-                    <div class="actions">
-                        <button class="pill" type="submit">save</button>
-                        <button class="pill" type="button" id="message-reset">use default</button>
+                <div class="message-row">
+                    <form class="message-editor" id="message-form">
+                        <span class="caption">shown to people who aren't whitelisted · MiniMessage · {name} = their name · {site} = this site</span>
+                        <textarea name="message" spellcheck="false" aria-label="Kick message"></textarea>
+                        <div class="actions">
+                            <button class="pill is-main" type="submit">save</button>
+                            <button class="pill" type="button" id="message-reset">use default</button>
+                        </div>
+                    </form>
+                    <div class="message-preview">
+                        <span class="caption">what they see</span>
+                        <div class="disconnect-screen" id="message-preview" aria-live="polite"></div>
                     </div>
-                </form>
+                </div>
             </section>
-
-            <details class="row admin-block history" id="history">
-                <summary>dias@mc:~$ /whitelist history (<span id="history-count">0</span>)</summary>
-                <div id="history-list"></div>
-            </details>
 
         </div>
 
@@ -143,6 +161,23 @@
         </footer>
 
     </main>
+
+    <!-- the confirm popup, drawn like the game's menu screens, the same as the popups on the main page (admin.js) -->
+    <div class="veil" id="veil" aria-hidden="true">
+        <section class="panel is-confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+            <div class="panel-head">
+                <h2 id="confirm-title">Are you sure?</h2>
+                <button class="mc-close" type="button" data-answer="no" aria-label="Cancel">&#10005;</button>
+            </div>
+            <div class="panel-body">
+                <p class="confirm-text" id="confirm-text"></p>
+            </div>
+            <div class="panel-buttons">
+                <button class="mc-button" type="button" data-answer="no">Cancel</button>
+                <button class="mc-button" type="button" data-answer="yes" id="confirm-yes">Yes</button>
+            </div>
+        </section>
+    </div>
 </body>
 
 </html>

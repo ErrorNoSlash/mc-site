@@ -234,6 +234,7 @@ route("GET", /^\/api\/admin\/overview$/, (req) => {
         requests: [...store.allRequests()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 500),
         whitelist: { ...whitelist, defaultMessage: store.DEFAULT_MESSAGE },
         seen,
+        activity: store.getActivity().slice(-100).reverse(),
         ntfy: ntfyEnabled(),
     };
 });

@@ -1,4 +1,4 @@
-// Requests and the whitelist live in two small JSON files in DATA_DIR.
+// Requests, the whitelist and the history of changes live in small JSON files in DATA_DIR.
 // After every change the whitelist is also written to PLUGIN_DIR/whitelist.txt for the Velocity plugin.
 
 import fs from "node:fs";
@@ -8,6 +8,7 @@ import { config } from "./config.js";
 
 const requestsFile = () => path.join(config.dataDir, "requests.json");
 const whitelistFile = () => path.join(config.dataDir, "whitelist.json");
+const activityFile = () => path.join(config.dataDir, "activity.json");
 const exportFile = () => path.join(config.pluginDir, "whitelist.txt");
 const seenFile = () => path.join(config.pluginDir, "seen.tsv");
 
@@ -15,8 +16,12 @@ export const DEFAULT_MESSAGE =
     "<red>You're not on the whitelist yet.</red><newline><newline>"
     + "<gray>Request access at</gray> <white>{site}</white>";
 
+// the history keeps the newest changes only
+const ACTIVITY_LIMIT = 300;
+
 let requests = [];
 let whitelist = { enforced: false, message: "", players: [] };
+let activity = [];
 let lastExportTime = 0;
 
 function readJson(file, fallback) {
@@ -51,6 +56,7 @@ export function load() {
         message: typeof stored.message === "string" ? stored.message : "",
         players: Array.isArray(stored.players) ? stored.players : [],
     };
+    activity = readJson(activityFile(), null)?.activity || seedActivity();
     exportWhitelist();
 }
 
@@ -61,6 +67,36 @@ function saveRequests() {
 function saveWhitelist() {
     writeAtomic(whitelistFile(), JSON.stringify({ version: 1, ...whitelist }, null, 2));
     exportWhitelist();
+}
+
+/* ---------- history ---------- */
+
+/* one change: who, what and when (newest last) */
+function record(action, details) {
+    activity.push({ at: new Date().toISOString(), action, ...details });
+    if (activity.length > ACTIVITY_LIMIT) activity = activity.slice(-ACTIVITY_LIMIT);
+    writeAtomic(activityFile(), JSON.stringify({ version: 1, activity }, null, 2));
+}
+
+/* before the history existed: rebuild what the requests and the whitelist still tell */
+function seedActivity() {
+    const events = [];
+    for (const player of whitelist.players) {
+        if (!String(player.source || "").startsWith("request")) {
+            events.push({ at: player.addedAt, action: "added", edition: player.edition, name: player.name, source: player.source });
+        }
+    }
+    for (const request of requests) {
+        events.push({ at: request.createdAt, action: "requested", edition: request.edition, name: request.name, requestId: request.id });
+        if (request.decidedAt) {
+            events.push({ at: request.decidedAt, action: request.status, edition: request.edition, name: request.name, via: request.decidedVia, requestId: request.id });
+        }
+    }
+    return events.filter((event) => event.at).sort((a, b) => a.at.localeCompare(b.at)).slice(-ACTIVITY_LIMIT);
+}
+
+export function getActivity() {
+    return activity;
 }
 
 /* the file the plugin reads; tabs separate columns, so none may appear inside a value */
@@ -137,6 +173,7 @@ export function addRequest({ edition, name, enteredName, uuid, note, ipHash }) {
     };
     requests.push(request);
     saveRequests();
+    record("requested", { edition, name, requestId: request.id });
     return request;
 }
 
@@ -148,19 +185,23 @@ export function decideRequest(id, approve, via) {
     request.decidedAt = new Date().toISOString();
     request.decidedVia = via;
     saveRequests();
+    record(request.status, { edition: request.edition, name: request.name, via, requestId: request.id });
+    // the decision is the history line, so adding or removing the player is not one of its own
     if (approve) {
         addPlayer({ edition: request.edition, name: request.name, uuid: request.uuid, source: `request ${request.id}` });
     } else if (wasApproved) {
-        removePlayer(playerKey(request.edition, request.name, request.uuid));
+        removePlayer(playerKey(request.edition, request.name, request.uuid), true);
     }
     return { request };
 }
 
 export function deleteRequest(id) {
-    const before = requests.length;
-    requests = requests.filter((request) => request.id !== id);
-    if (requests.length !== before) saveRequests();
-    return requests.length !== before;
+    const request = findRequest(id);
+    if (!request) return false;
+    requests = requests.filter((item) => item !== request);
+    saveRequests();
+    record("forgotten", { edition: request.edition, name: request.name });
+    return true;
 }
 
 /* ---------- whitelist ---------- */
@@ -191,14 +232,17 @@ export function addPlayer({ edition, name, uuid, source }) {
     const player = { key, edition, name, uuid: uuid || null, addedAt: new Date().toISOString(), source };
     whitelist.players.push(player);
     saveWhitelist();
+    if (!source.startsWith("request")) record("added", { edition, name, source });
     return player;
 }
 
-export function removePlayer(key) {
-    const before = whitelist.players.length;
-    whitelist.players = whitelist.players.filter((player) => player.key !== key);
-    if (whitelist.players.length === before) return false;
+/* isPartOfDecision: a request decision already wrote the history line */
+export function removePlayer(key, isPartOfDecision = false) {
+    const player = whitelist.players.find((item) => item.key === key);
+    if (!player) return false;
+    whitelist.players = whitelist.players.filter((item) => item !== player);
     saveWhitelist();
+    if (!isPartOfDecision) record("removed", { edition: player.edition, name: player.name });
 
     // their approved request no longer holds (and they can't simply ask again)
     let changed = false;
@@ -215,9 +259,13 @@ export function removePlayer(key) {
 }
 
 export function updateSettings({ enforced, message }) {
+    const wasEnforced = whitelist.enforced;
+    const oldMessage = whitelist.message;
     if (typeof enforced === "boolean") whitelist.enforced = enforced;
     if (typeof message === "string") whitelist.message = message;
     saveWhitelist();
+    if (whitelist.enforced !== wasEnforced) record(whitelist.enforced ? "turned on" : "turned off", {});
+    if (whitelist.message !== oldMessage) record(whitelist.message ? "message changed" : "message reset", {});
     return whitelist;
 }
 

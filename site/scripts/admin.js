@@ -1,6 +1,7 @@
 /*admin page: approve requests, manage the whitelist, turn it on and off*/
 const tokenStorageKey = "whitelistAdminToken";
 
+const loginTitle = document.querySelector("#login-title");
 const loginView = document.querySelector("#login-view");
 const loginForm = document.querySelector("#login-form");
 const loginOutput = document.querySelector("#login-output");
@@ -10,11 +11,19 @@ const notice = document.querySelector("#notice");
 const enforceButton = document.querySelector("#enforce");
 const messageForm = document.querySelector("#message-form");
 const messageBox = messageForm.elements.message;
+const messagePreview = document.querySelector("#message-preview");
+
+const veil = document.querySelector("#veil");
+const confirmTitle = document.querySelector("#confirm-title");
+const confirmText = document.querySelector("#confirm-text");
+const confirmYes = document.querySelector("#confirm-yes");
 
 let token = "";
 let overview = null;
 let messageDirty = false;
 let noticeTimer = null;
+let answerConfirm = null;
+let focusBeforeConfirm = null;
 
 /* token */
 
@@ -46,6 +55,7 @@ function adminApi(path, options = {}) {
 
 function showLogin(message) {
     adminView.hidden = true;
+    loginTitle.hidden = false;
     loginView.hidden = false;
     logoutButton.hidden = true;
     if (message) {
@@ -59,6 +69,38 @@ function flash(message, isError) {
     notice.hidden = false;
     clearTimeout(noticeTimer);
     noticeTimer = setTimeout(function () { notice.hidden = true; }, isError ? 7000 : 3000);
+}
+
+/* confirm popup: the game's menu screen instead of the browser's confirm box */
+
+/*opens the popup and waits: true for the yes button, false for cancel, the ✕, Esc or a click outside*/
+function askConfirm(title, text, yesLabel) {
+    confirmTitle.textContent = title;
+    confirmText.textContent = text;
+    confirmYes.textContent = yesLabel;
+    focusBeforeConfirm = document.activeElement;
+
+    veil.classList.add("is-open");
+    veil.setAttribute("aria-hidden", "false");
+    document.body.classList.add("popup-open");
+    document.querySelector(".sheet").inert = true;
+    confirmYes.focus();
+
+    return new Promise(function (resolve) {
+        answerConfirm = resolve;
+    });
+}
+
+function closeConfirm(answer) {
+    if (!answerConfirm) return;
+    veil.classList.remove("is-open");
+    veil.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("popup-open");
+    document.querySelector(".sheet").inert = false;
+
+    answerConfirm(answer);
+    answerConfirm = null;
+    if (focusBeforeConfirm) focusBeforeConfirm.focus();
 }
 
 /* runs an admin action, shows what happened and reloads the lists */
@@ -93,45 +135,60 @@ function editionTag(edition) {
     return h("span", { class: "tag" }, edition);
 }
 
+/*a waiting request: a big card, it is the thing to act on*/
 function pendingRow(request) {
     const details = ["asked " + timeAgo(request.createdAt)];
     if (request.edition === "bedrock") details.push("gamertag “" + request.enteredName + "”");
-    else if (request.uuid) details.push(request.uuid);
+    else if (request.uuid) details.push("real Mojang account");
 
-    return h("div", { class: "admin-row" },
-        who(request,
-            h("b", null, request.name), editionTag(request.edition),
+    return h("article", { class: "request-card" },
+        playerHead(request.name, request.edition === "java" ? request.uuid : null),
+        h("div", { class: "request-text" },
+            h("div", null, h("b", null, request.name), editionTag(request.edition)),
             h("small", null, details.join(" · ")),
             request.note ? h("span", { class: "note" }, request.note) : null
         ),
         h("div", { class: "actions" },
             h("button", {
-                class: "pill", type: "button",
+                class: "pill big is-main", type: "button",
                 onclick: function () { act(adminApi("/api/admin/requests/" + request.id + "/approve", { method: "POST" }), request.name + " is whitelisted"); }
             }, "approve"),
             h("button", {
-                class: "pill", type: "button",
+                class: "pill big", type: "button",
                 onclick: function () { act(adminApi("/api/admin/requests/" + request.id + "/deny", { method: "POST" }), request.name + " denied"); }
             }, "deny")
         )
     );
 }
 
+/*what the seen list knows about a listed player: when they last played and how often*/
+function seenFor(player) {
+    return overview.seen.find(function (entry) {
+        if (player.edition === "java") return entry.uuid === player.uuid;
+        return entry.edition === "bedrock" && entry.name.toLowerCase() === player.name.toLowerCase();
+    });
+}
+
 function listedRow(player) {
-    const source = player.source && player.source.startsWith("request") ? "from a request" : player.source === "seen" ? "from the seen list" : "added by hand";
+    const seen = seenFor(player);
+    const played = seen
+        ? "last seen " + timeAgo(seen.lastSeen) + " · " + seen.logins + (seen.logins === 1 ? " login" : " logins")
+        : "hasn't joined yet";
     return h("div", { class: "admin-row" },
         who(player,
             h("b", null, player.name), editionTag(player.edition),
-            h("small", null, "added " + timeAgo(player.addedAt) + " · " + source)
+            h("small", null, played)
         ),
         h("div", { class: "actions" },
+            h("small", { class: "listed-when", title: new Date(player.addedAt).toLocaleString() }, "listed " + timeAgo(player.addedAt)),
             h("button", {
-                class: "pill small", type: "button",
-                onclick: function () {
-                    if (!confirm("Take " + player.name + " off the whitelist?" + (overview.whitelist.enforced ? " If they're online they get kicked." : ""))) return;
+                class: "pill icon", type: "button", "aria-label": "Remove " + player.name, title: "Remove " + player.name,
+                onclick: async function () {
+                    const kickNote = overview.whitelist.enforced ? " If they're online they get kicked." : "";
+                    if (!await askConfirm("Remove " + player.name + "?", "They come off the whitelist." + kickNote, "Remove")) return;
                     act(adminApi("/api/admin/players/" + encodeURIComponent(player.key), { method: "DELETE" }), player.name + " removed");
                 }
-            }, "remove")
+            }, "✕")
         )
     );
 }
@@ -160,39 +217,105 @@ function seenRow(entry) {
     );
 }
 
-function historyRow(request) {
-    const actions = [];
-    if (request.status === "approved") {
-        actions.push(h("button", {
-            class: "pill small", type: "button",
-            onclick: function () {
-                if (!confirm("Revoke " + request.name + "? They come off the whitelist.")) return;
-                act(adminApi("/api/admin/requests/" + request.id + "/deny", { method: "POST" }), request.name + " revoked");
-            }
-        }, "revoke"));
-    } else {
-        actions.push(h("button", {
+/* history */
+
+const historyText = {
+    "added": function (entry) { return [h("b", null, entry.name), " added ", h("small", null, entry.source === "seen" ? "from the seen list" : "by hand")]; },
+    "removed": function (entry) { return [h("b", null, entry.name), " removed"]; },
+    "requested": function (entry) { return [h("b", null, entry.name), " asked to join"]; },
+    "approved": function (entry) { return [h("b", null, entry.name), " approved ", h("small", null, entry.via === "ntfy" ? "from a notification" : "")]; },
+    "denied": function (entry) { return [h("b", null, entry.name), " denied ", h("small", null, entry.via === "removed" ? "taken off the list" : entry.via === "ntfy" ? "from a notification" : "")]; },
+    "forgotten": function (entry) { return [h("b", null, entry.name), "'s request forgotten"]; },
+    "turned on": function () { return ["whitelist turned ", h("b", null, "ON")]; },
+    "turned off": function () { return ["whitelist turned ", h("b", null, "OFF")]; },
+    "message changed": function () { return ["kick message changed"]; },
+    "message reset": function () { return ["kick message back to the default"]; }
+};
+
+/*a denied request that is still there can be approved after all, or forgotten so they can ask again*/
+function deniedActions(entry) {
+    const request = overview.requests.find(function (item) { return item.id === entry.requestId; });
+    if (!request || request.status !== "denied") return null;
+    return h("span", { class: "actions" },
+        h("button", {
             class: "pill small", type: "button",
             onclick: function () { act(adminApi("/api/admin/requests/" + request.id + "/approve", { method: "POST" }), request.name + " is whitelisted"); }
-        }, "approve"));
-    }
-    actions.push(h("button", {
-        class: "pill small", type: "button", title: "Delete the request so they can ask again",
-        onclick: function () { act(adminApi("/api/admin/requests/" + request.id, { method: "DELETE" }), "request deleted"); }
-    }, "forget"));
-
-    return h("div", { class: "admin-row" },
-        who(request,
-            h("b", null, request.name), editionTag(request.edition), h("span", { class: "tag" }, request.status),
-            h("small", null, timeAgo(request.decidedAt || request.createdAt) + (request.decidedVia ? " via " + request.decidedVia : "")),
-            request.note ? h("span", { class: "note" }, request.note) : null
-        ),
-        h("div", { class: "actions" }, actions)
+        }, "approve"),
+        h("button", {
+            class: "pill small", type: "button", title: "Delete the request so they can ask again",
+            onclick: function () { act(adminApi("/api/admin/requests/" + request.id, { method: "DELETE" }), "request deleted"); }
+        }, "forget")
     );
 }
 
+function historyRow(entry, index, list) {
+    const text = historyText[entry.action] ? historyText[entry.action](entry) : [entry.action];
+    // only the newest line about a request gets its buttons
+    const isNewestForRequest = !list.slice(0, index).some(function (other) { return other.requestId && other.requestId === entry.requestId; });
+    const time = new Date(entry.at);
+    return h("li", null,
+        h("time", { datetime: entry.at, title: time.toLocaleString() }, time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })),
+        h("span", null, ...text),
+        entry.action === "denied" && isNewestForRequest ? deniedActions(entry) : null
+    );
+}
+
+/* kick message preview: the MiniMessage tags the plugin understands, drawn like the game draws them */
+
+const minecraftColors = {
+    black: "#000000", dark_blue: "#0000aa", dark_green: "#00aa00", dark_aqua: "#00aaaa",
+    dark_red: "#aa0000", dark_purple: "#aa00aa", gold: "#ffaa00", gray: "#aaaaaa",
+    dark_gray: "#555555", blue: "#5555ff", green: "#55ff55", aqua: "#55ffff",
+    red: "#ff5555", light_purple: "#ff55ff", yellow: "#ffff55", white: "#ffffff"
+};
+const minecraftStyles = {
+    bold: "font-weight:700", b: "font-weight:700",
+    italic: "font-style:italic", i: "font-style:italic", em: "font-style:italic",
+    underlined: "text-decoration:underline", u: "text-decoration:underline",
+    strikethrough: "text-decoration:line-through", st: "text-decoration:line-through"
+};
+
+/*one tag as a bit of css, or nothing when the preview doesn't know it*/
+function tagStyle(tag) {
+    const name = tag.replace(/^color:/, "");
+    if (minecraftColors[name]) return "color:" + minecraftColors[name];
+    if (/^#[0-9a-f]{6}$/i.test(name)) return "color:" + name;
+    return minecraftStyles[tag] || null;
+}
+
+function renderMessagePreview() {
+    const text = messageBox.value
+        .replaceAll("{name}", "Steve")
+        .replaceAll("{site}", location.host || "join.errornoslash.be");
+    const parts = [];
+    let styles = [];
+    let last = 0;
+
+    // plain text between the tags gets the styles that are open at that point
+    function addText(piece) {
+        const css = styles.map(function (open) { return open.css; }).join(";");
+        if (piece) parts.push(h("span", { style: css || null }, piece));
+    }
+
+    for (const match of text.matchAll(/<(\/?)([\w#:]+)>/g)) {
+        addText(text.slice(last, match.index));
+        last = match.index + match[0].length;
+        const [, closing, tag] = match;
+        const name = tag.toLowerCase();
+        if (name === "newline" || name === "br") parts.push(h("br"));
+        else if (name === "reset") styles = [];
+        else if (closing) styles = styles.filter(function (open) { return open.tag !== name; });
+        else if (tagStyle(name)) styles.push({ tag: name, css: tagStyle(name) });
+        else addText(match[0]);
+    }
+    addText(text.slice(last));
+    messagePreview.replaceChildren(...parts);
+}
+
 function fill(id, rows, emptyText) {
-    document.querySelector("#" + id).replaceChildren(...(rows.length ? rows : [h("div", { class: "empty" }, emptyText)]));
+    const list = document.querySelector("#" + id);
+    const empty = h(list.tagName === "OL" ? "li" : "div", { class: "empty" }, emptyText);
+    list.replaceChildren(...(rows.length ? rows : [empty]));
 }
 
 /* render */
@@ -200,7 +323,6 @@ function fill(id, rows, emptyText) {
 function render(data) {
     overview = data;
     const pending = data.requests.filter(function (request) { return request.status === "pending"; });
-    const decided = data.requests.filter(function (request) { return request.status !== "pending"; });
     const unlisted = data.seen.filter(function (entry) { return !entry.listed; });
     const players = [...data.whitelist.players].sort(function (a, b) { return a.name.localeCompare(b.name); });
 
@@ -217,15 +339,17 @@ function render(data) {
 
     document.querySelector("#ntfy-state").textContent = data.ntfy ? "ntfy on" : "ntfy off";
     document.querySelector("#ntfy-test").hidden = !data.ntfy;
-    fill("pending-list", pending.map(pendingRow), "nothing waiting.");
+    document.querySelector("#pending-list").replaceChildren(...pending.map(pendingRow));
+    document.querySelector("#pending-empty").hidden = pending.length > 0;
+    document.querySelector("#listed-count").textContent = players.length + (players.length === 1 ? " player" : " players");
     fill("listed-list", players.map(listedRow), "nobody yet. add yourself first!");
     fill("seen-list", unlisted.map(seenRow), data.seen.length ? "everyone who joined is listed." : "nobody has joined since the plugin was installed.");
     document.querySelector("#add-all-seen").hidden = unlisted.length < 2;
-    document.querySelector("#history-count").textContent = decided.length;
-    fill("history-list", decided.map(historyRow), "no decisions yet.");
+    fill("history-list", (data.activity || []).map(historyRow), "nothing has changed yet.");
 
     if (!messageDirty && document.activeElement !== messageBox) {
         messageBox.value = data.whitelist.message || data.whitelist.defaultMessage;
+        renderMessagePreview();
     }
     document.querySelector("#refreshed").textContent = "refreshed " + new Date().toLocaleTimeString();
 }
@@ -234,6 +358,7 @@ async function load() {
     if (!token) return showLogin();
     try {
         render(await adminApi("/api/admin/overview"));
+        loginTitle.hidden = true;
         loginView.hidden = true;
         adminView.hidden = false;
         logoutButton.hidden = false;
@@ -270,20 +395,25 @@ logoutButton.addEventListener("click", function () {
     showLogin();
 });
 
-enforceButton.addEventListener("click", function () {
+/* the switch asks first, both ways */
+enforceButton.addEventListener("click", async function () {
     if (!overview) return;
     const turnOn = !overview.whitelist.enforced;
+
     if (turnOn) {
         const unlisted = overview.seen.filter(function (entry) { return !entry.listed; });
-        let warning = "Turn the whitelist ON? Only listed players can join, and anyone online who isn't listed gets kicked.";
+        let warning = "Only listed players can join, and anyone online who isn't listed gets kicked.";
         if (overview.whitelist.players.length === 0) {
-            warning = "Nobody is on the whitelist yet, so EVERYONE (you too) will be turned away. Turn it on anyway?";
+            warning = "Nobody is on the whitelist yet, so everyone (you too) will be turned away.";
         } else if (unlisted.length) {
             const names = unlisted.slice(0, 8).map(function (entry) { return entry.name; }).join(", ");
             warning += "\n\n" + unlisted.length + " player(s) who joined before aren't listed: " + names + (unlisted.length > 8 ? ", ..." : "");
         }
-        if (!confirm(warning)) return;
+        if (!await askConfirm("Turn the whitelist on?", warning, "Turn on")) return;
+    } else if (!await askConfirm("Turn the whitelist off?", "Anyone can join the server again until you turn it back on.", "Turn off")) {
+        return;
     }
+
     act(adminApi("/api/admin/settings", { method: "PUT", body: { enforced: turnOn } }), "whitelist " + (turnOn ? "on" : "off"));
 });
 
@@ -297,7 +427,7 @@ document.querySelector("#add-form").addEventListener("submit", function (e) {
 
 document.querySelector("#add-all-seen").addEventListener("click", async function () {
     const unlisted = overview.seen.filter(function (entry) { return !entry.listed; });
-    if (!confirm("Whitelist all " + unlisted.length + " players who joined before?")) return;
+    if (!await askConfirm("Add all " + unlisted.length + " players?", "Everyone who joined before but isn't listed goes on the whitelist.", "Add all")) return;
     act(Promise.all(unlisted.map(addSeen)), unlisted.length + " players whitelisted");
 });
 
@@ -305,7 +435,11 @@ document.querySelector("#ntfy-test").addEventListener("click", function () {
     act(adminApi("/api/admin/test-notification", { method: "POST" }), "test notification sent, check your phone");
 });
 
-messageBox.addEventListener("input", function () { messageDirty = true; });
+/* the preview follows every key */
+messageBox.addEventListener("input", function () {
+    messageDirty = true;
+    renderMessagePreview();
+});
 
 messageForm.addEventListener("submit", function (e) {
     e.preventDefault();
@@ -317,7 +451,19 @@ messageForm.addEventListener("submit", function (e) {
 document.querySelector("#message-reset").addEventListener("click", function () {
     messageBox.value = overview.whitelist.defaultMessage;
     messageDirty = false;
+    renderMessagePreview();
     act(adminApi("/api/admin/settings", { method: "PUT", body: { message: "" } }), "back to the default message");
+});
+
+/* the popup's buttons, or a click on the dark veil around it */
+veil.addEventListener("click", function (e) {
+    const button = e.target.closest("[data-answer]");
+    if (button) closeConfirm(button.dataset.answer === "yes");
+    else if (e.target === veil) closeConfirm(false);
+});
+
+window.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeConfirm(false);
 });
 
 /* start */
