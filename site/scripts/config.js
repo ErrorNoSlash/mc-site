@@ -20,6 +20,15 @@ const site = {
     // the whole skin in the player popup, the same way
     skinsUrl: "https://mc-heads.net/body/{name}/120",
 
+    // a short line about each server in its popup, by the name the status gives it (any case);
+    // a server that isn't here gets no line
+    serverInfo: {
+        "ds network": "The address everyone joins: one network that holds the worlds below, for Java and Bedrock alike.",
+        "survival": "The main world: plain survival with friends. Build, explore, and leave other people's things alone.",
+        "survival-old": "The previous survival world, kept up so nothing built there gets lost.",
+        "anarchy": "No rules: anything goes, griefing included. Don't bring anything you'd miss."
+    },
+
     // the yellow-text-on-the-title-screen kind of line, one picked at random
     splashes: [
         "now with bedrock!",

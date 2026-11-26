@@ -194,16 +194,21 @@ function playerSkin(name, uuid) {
     return image;
 }
 
-/*the player popup's inside, on both pages: their skin next to a list of what is known about them.
+/*the inside of a player or server popup: a picture next to label / value lines.
   facts are [label, value] pairs; an empty one is left out*/
-function playerCard(name, uuid, facts) {
+function infoCard(picture, facts) {
     const lines = facts.filter(Boolean).flatMap(function (fact) {
         return [h("dt", null, fact[0]), h("dd", null, fact[1])];
     });
-    return h("div", { class: "player-card" },
-        playerSkin(name, uuid),
-        h("dl", { class: "player-facts" }, ...lines)
+    return h("div", { class: "info-card" },
+        picture,
+        h("dl", { class: "info-facts" }, ...lines)
     );
+}
+
+/*a player popup's inside, on both pages: their skin next to what is known about them*/
+function playerCard(name, uuid, facts) {
+    return infoCard(playerSkin(name, uuid), facts);
 }
 
 /*splash text: a random line, another one on click*/

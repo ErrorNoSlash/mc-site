@@ -638,6 +638,11 @@ textarea {
         border-bottom: none;
     }
 
+    /* it opens its server popup */
+    &[data-server] {
+        cursor: pointer;
+    }
+
     .server-number {
         font-size: 0.75rem;
         opacity: 0.6;
@@ -1037,13 +1042,13 @@ body.popup-open .sheet :is(*, *::before, *::after) {
     width: min(24rem, 100%);
 }
 
-/* a player popup: a little narrower than the server list */
+/* a player or server popup: a little narrower than the server list */
 .panel.is-player {
     width: min(34rem, 100%);
 }
 
-/* their skin on the left, what is known about them on the right */
-.player-card {
+/* a picture (a skin, a server icon) on the left, what is known on the right */
+.info-card {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
@@ -1064,8 +1069,33 @@ body.popup-open .sheet :is(*, *::before, *::after) {
     }
 }
 
+/* a server's icon, big and pixel sharp */
+.info-card .info-picture {
+    width: 4rem;
+    height: 4rem;
+}
+
+/* the line about a server, above its card */
+.info-about {
+    margin: 0 0 1rem;
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+/* who's on, as heads that open their player */
+.info-heads {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+
+    .head {
+        width: 1.75rem;
+        height: 1.75rem;
+    }
+}
+
 /* label and value lines */
-.player-facts {
+.info-facts {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     gap: 0.4rem 1rem;
@@ -1083,7 +1113,28 @@ body.popup-open .sheet :is(*, *::before, *::after) {
     }
 }
 
-/* a value you can copy by clicking it (the uuid) */
+/* a head that opens its player (admin lists, server popups); it lifts a little when pointed at */
+.head-button {
+    flex: none;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    line-height: 0;
+    cursor: pointer;
+    transition: transform 0.2s var(--ease-out);
+
+    &:is(:hover, :focus-visible) {
+        transform: translateY(-0.125rem);
+    }
+
+    &:focus-visible {
+        outline: 0.125rem solid var(--foreground);
+        outline-offset: 0.125rem;
+    }
+}
+
+/* a value you can copy by clicking it (a uuid, an address) */
 .copy-text {
     padding: 0;
     border: none;
@@ -1514,27 +1565,6 @@ body.popup-open .sheet :is(*, *::before, *::after) {
     .pill[aria-pressed="true"] {
         background: var(--foreground);
         color: var(--background);
-    }
-}
-
-/* admin: a head that opens its player; it lifts a little when pointed at */
-.head-button {
-    flex: none;
-    padding: 0;
-    border: none;
-    background: none;
-    color: inherit;
-    line-height: 0;
-    cursor: pointer;
-    transition: transform 0.2s var(--ease-out);
-
-    &:is(:hover, :focus-visible) {
-        transform: translateY(-0.125rem);
-    }
-
-    &:focus-visible {
-        outline: 0.125rem solid var(--foreground);
-        outline-offset: 0.125rem;
     }
 }
 
@@ -2722,13 +2752,13 @@ body.cursor-on-link {
         padding-block: 0.75rem;
     }
 
-    /* the player popup: the skin above the facts */
-    .player-card {
+    /* the player and server popups: the picture above the facts */
+    .info-card {
         grid-template-columns: minmax(0, 1fr);
         justify-items: center;
     }
 
-    .player-facts {
+    .info-facts {
         justify-self: stretch;
     }
 

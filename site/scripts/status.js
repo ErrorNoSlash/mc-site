@@ -55,7 +55,12 @@ function serverRow(server, index, isNetwork) {
         details.push(isNetwork ? "the proxy isn't answering" : "not answering pings");
     }
 
-    return h("div", { class: "server-row" + (server.online ? "" : " is-offline") + (isNetwork ? " is-network" : "") },
+    // the row opens its server popup (popups.js)
+    return h("div", {
+        class: "server-row" + (server.online ? "" : " is-offline") + (isNetwork ? " is-network" : ""),
+        role: "button", tabindex: "0", "aria-label": "About " + server.name,
+        "data-server": isNetwork ? "network" : String(index - 1)
+    },
         h("span", { class: "server-number" }, isNetwork ? "~" : String(index).padStart(2, "0")),
         h("span", null,
             h("b", { class: "server-name" }, server.name),
