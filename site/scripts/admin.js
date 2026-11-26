@@ -19,6 +19,8 @@ const messageBox = messageForm.elements.message;
 const messagePreview = document.querySelector("#message-preview");
 
 const veil = document.querySelector("#veil");
+const playerPanel = document.querySelector("#panel-player");
+const confirmPanel = document.querySelector("#panel-confirm");
 const confirmTitle = document.querySelector("#confirm-title");
 const confirmText = document.querySelector("#confirm-text");
 const confirmYes = document.querySelector("#confirm-yes");
@@ -29,7 +31,7 @@ let renderedKey = "";
 let messageDirty = false;
 let noticeTimer = null;
 let answerConfirm = null;
-let focusBeforeConfirm = null;
+let focusBeforePopup = null;
 
 /* login */
 
@@ -69,19 +71,40 @@ function flash(message, isError) {
     noticeTimer = setTimeout(function () { notice.hidden = true; }, isError ? 7000 : 3000);
 }
 
-/* confirm popup: the game's menu screen instead of the browser's confirm box */
+/* popups: drawn like the game's menu screens; one at a time, the page behind can't be reached meanwhile */
 
-/*opens the popup and waits: true for the yes button, false for cancel, the ✕, Esc or a click outside*/
-function askConfirm(title, text, yesLabel) {
-    confirmTitle.textContent = title;
-    confirmText.textContent = text;
-    confirmYes.textContent = yesLabel;
-    focusBeforeConfirm = document.activeElement;
-
+function openPopup(panel) {
+    if (!veil.classList.contains("is-open")) focusBeforePopup = document.activeElement;
+    [playerPanel, confirmPanel].forEach(function (other) {
+        other.hidden = other !== panel;
+    });
     veil.classList.add("is-open");
     veil.setAttribute("aria-hidden", "false");
     document.body.classList.add("popup-open");
     sheet.inert = true;
+}
+
+function closePopup() {
+    // a confirm question that is closed some other way counts as "no"
+    if (answerConfirm) {
+        answerConfirm(false);
+        answerConfirm = null;
+    }
+    veil.classList.remove("is-open");
+    veil.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("popup-open");
+    sheet.inert = false;
+    if (focusBeforePopup) focusBeforePopup.focus();
+    focusBeforePopup = null;
+}
+
+/*asks first, in the confirm popup instead of the browser's confirm box: true for the yes button,
+  false for cancel, the ✕, Esc or a click outside*/
+function askConfirm(title, text, yesLabel) {
+    confirmTitle.textContent = title;
+    confirmText.textContent = text;
+    confirmYes.textContent = yesLabel;
+    openPopup(confirmPanel);
     confirmYes.focus();
 
     return new Promise(function (resolve) {
@@ -91,14 +114,10 @@ function askConfirm(title, text, yesLabel) {
 
 function closeConfirm(answer) {
     if (!answerConfirm) return;
-    veil.classList.remove("is-open");
-    veil.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("popup-open");
-    sheet.inert = false;
-
-    answerConfirm(answer);
+    const resolve = answerConfirm;
     answerConfirm = null;
-    if (focusBeforeConfirm) focusBeforeConfirm.focus();
+    closePopup();
+    resolve(answer);
 }
 
 /* runs an admin action, shows what happened and reloads the lists */
@@ -122,10 +141,18 @@ async function act(promise, success) {
 
 /* rows */
 
+/*a head that opens its player*/
+function headButton(entry) {
+    return h("button", {
+        class: "head-button", type: "button", title: "About " + entry.name, "aria-label": "About " + entry.name,
+        onclick: function () { showPlayer(entry.edition, entry.name, entry.uuid); }
+    }, playerHead(entry.name, entry.edition === "java" ? entry.uuid : null));
+}
+
 /*head + text, like a player in the tab list*/
 function who(entry, ...children) {
     return h("div", { class: "who" },
-        playerHead(entry.name, entry.edition === "java" ? entry.uuid : null),
+        headButton(entry),
         h("div", null, ...children)
     );
 }
@@ -141,7 +168,7 @@ function pendingRow(request) {
     else if (request.uuid) details.push("real Mojang account");
 
     return h("article", { class: "request-card" },
-        playerHead(request.name, request.edition === "java" ? request.uuid : null),
+        headButton(request),
         h("div", { class: "request-text" },
             h("div", null, h("b", null, request.name), editionTag(request.edition)),
             h("small", null, details.join(" · ")),
@@ -256,6 +283,94 @@ function historyRow(entry, isNewestForRequest) {
         h("span", null, ...text),
         entry.action === "denied" && isNewestForRequest ? deniedActions(entry) : null
     );
+}
+
+/* the player popup */
+
+/*everything the lists already know about one player*/
+function playerInfo(edition, name, uuid) {
+    const lowerName = name.toLowerCase();
+    function isThem(item) {
+        if (item.edition !== edition) return false;
+        if (edition === "java" && uuid && item.uuid) return item.uuid === uuid;
+        return String(item.name).toLowerCase() === lowerName;
+    }
+    return {
+        listed: overview.whitelist.players.find(isThem),
+        seen: overview.seen.find(isThem),
+        // newest first, so this is their latest request
+        request: overview.requests.find(isThem),
+        history: (overview.activity || []).filter(function (entry) { return entry.name && isThem(entry); })
+    };
+}
+
+function dateText(iso) {
+    return new Date(iso).toLocaleString([], { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+}
+
+// how they got on the list ("request <id>" for an approved request)
+const listedHow = { seen: "from the seen list", admin: "by hand", request: "approved request" };
+
+function showPlayer(edition, name, uuid) {
+    const info = playerInfo(edition, name, uuid);
+    const listed = info.listed;
+    const seen = info.seen;
+    const request = info.request;
+    uuid = uuid || (listed && listed.uuid) || (seen && edition === "java" ? seen.uuid : null);
+
+    playerPanel.querySelector("#panel-player-title").textContent = name;
+    const card = playerCard(name, edition === "java" ? uuid : null, [
+        ["edition", edition === "java" ? "Java" : "Bedrock"],
+        uuid ? ["uuid", h("button", { class: "copy-text", type: "button", "data-copy": uuid, title: "Copy" }, uuid)] : null,
+        ["whitelist", listed ? "listed " + timeAgo(listed.addedAt) + " · " + (listedHow[String(listed.source).split(" ")[0]] || listed.source) : "not listed"],
+        ["first seen", seen ? dateText(seen.firstSeen) : "hasn't joined yet"],
+        seen ? ["last seen", timeAgo(seen.lastSeen) + (seen.turnedAway ? " · turned away" : "")] : null,
+        seen ? ["logins", String(seen.logins)] : null,
+        request ? ["request", request.status + " · asked " + timeAgo(request.createdAt)] : null,
+        request && request.note ? ["their note", "“" + request.note + "”"] : null
+    ]);
+    // their part of the history, newest first
+    const body = [card];
+    if (info.history.length) {
+        body.push(h("ol", { class: "player-history" }, ...info.history.slice(0, 8).map(function (entry) { return historyRow(entry, false); })));
+    }
+    playerPanel.querySelector("#panel-player-body").replaceChildren(...body);
+
+    // what can be done with them, depending on where they stand
+    let action = null;
+    if (listed) {
+        action = h("button", {
+            class: "mc-button", type: "button",
+            onclick: async function () {
+                const kickNote = overview.whitelist.enforced ? " If they're online they get kicked." : "";
+                if (!await askConfirm("Remove " + name + "?", "They come off the whitelist." + kickNote, "Remove")) return;
+                act(adminApi("/api/admin/players/" + encodeURIComponent(listed.key), { method: "DELETE" }), name + " removed");
+            }
+        }, "Remove");
+    } else if (request && request.status === "pending") {
+        action = h("button", {
+            class: "mc-button", type: "button",
+            onclick: function () {
+                closePopup();
+                act(adminApi("/api/admin/requests/" + request.id + "/approve", { method: "POST" }), name + " is whitelisted");
+            }
+        }, "Approve");
+    } else if (seen) {
+        action = h("button", {
+            class: "mc-button", type: "button",
+            onclick: function () {
+                closePopup();
+                act(addSeen(seen), name + " whitelisted");
+            }
+        }, "Add To Whitelist");
+    }
+    const buttons = [];
+    if (edition === "java") buttons.push(h("a", { class: "mc-button", href: "https://namemc.com/profile/" + encodeURIComponent(uuid || name), target: "_blank", rel: "noopener" }, "NameMC ↗"));
+    if (action) buttons.push(action);
+    playerPanel.querySelector("#panel-player-buttons").replaceChildren(...buttons);
+
+    openPopup(playerPanel);
+    playerPanel.querySelector("[data-close]").focus();
 }
 
 function historyRows(activity) {
@@ -489,15 +604,15 @@ pageTabs.forEach(function (tab) {
     });
 });
 
-/* the popup's buttons, or a click on the dark veil around it */
+/* the popups' buttons, or a click on the dark veil around them */
 veil.addEventListener("click", function (e) {
-    const button = e.target.closest("[data-answer]");
-    if (button) closeConfirm(button.dataset.answer === "yes");
-    else if (e.target === veil) closeConfirm(false);
+    const answer = e.target.closest("[data-answer]");
+    if (answer) closeConfirm(answer.dataset.answer === "yes");
+    else if (e.target === veil || e.target.closest("[data-close]")) closePopup();
 });
 
 window.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") closeConfirm(false);
+    if (e.key === "Escape" && veil.classList.contains("is-open")) closePopup();
 });
 
 /* start */

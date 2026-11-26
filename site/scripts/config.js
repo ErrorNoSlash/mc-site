@@ -17,6 +17,8 @@ const site = {
     // player heads in the hotbar and admin lists ({name} is filled in); set to "" to turn them off
     // (Bedrock players and unknown names get a plain pixel head instead)
     headsUrl: "https://mc-heads.net/avatar/{name}/32",
+    // the whole skin in the player popup, the same way
+    skinsUrl: "https://mc-heads.net/body/{name}/120",
 
     // the yellow-text-on-the-title-screen kind of line, one picked at random
     splashes: [

@@ -172,6 +172,40 @@ function playerHead(name, uuid) {
     return image;
 }
 
+/*a player's whole skin, for the player popup; Bedrock players and unknown names get a big plain head*/
+function playerSkin(name, uuid) {
+    const isJavaName = /^\w{3,16}$/.test(name || "");
+    if (!site.skinsUrl || (!isJavaName && !uuid)) {
+        const face = plainHead();
+        face.classList.add("player-skin");
+        return face;
+    }
+    const image = h("img", {
+        class: "player-skin",
+        src: site.skinsUrl.replace("{name}", encodeURIComponent(uuid || name)),
+        alt: name + "'s skin",
+        referrerpolicy: "no-referrer"
+    });
+    image.addEventListener("error", function () {
+        const face = plainHead();
+        face.classList.add("player-skin");
+        image.replaceWith(face);
+    }, { once: true });
+    return image;
+}
+
+/*the player popup's inside, on both pages: their skin next to a list of what is known about them.
+  facts are [label, value] pairs; an empty one is left out*/
+function playerCard(name, uuid, facts) {
+    const lines = facts.filter(Boolean).flatMap(function (fact) {
+        return [h("dt", null, fact[0]), h("dd", null, fact[1])];
+    });
+    return h("div", { class: "player-card" },
+        playerSkin(name, uuid),
+        h("dl", { class: "player-facts" }, ...lines)
+    );
+}
+
 /*splash text: a random line, another one on click*/
 document.querySelectorAll(".splash").forEach(function (splash) {
     const lines = site.splashes || [];

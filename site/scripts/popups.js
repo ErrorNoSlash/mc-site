@@ -1,4 +1,5 @@
-/*ds/, status? and join? open a popup drawn like the game's menu screens: contact links, the server list or the request form*/
+/*ds/, status? and join? open a popup drawn like the game's menu screens: contact links, the server list or the request form.
+  a head in the hotbar opens that player*/
 const veil = document.querySelector("#veil");
 const sheet = document.querySelector(".sheet");
 const panels = [...veil.querySelectorAll(".panel")];
@@ -53,6 +54,26 @@ function fillStatusPanel(status) {
         : count + " online" + (names.length ? ": " + names.join(", ") + (count > names.length ? " and " + (count - names.length) + " more" : "") : "");
 }
 
+/* a player in the hotbar: their skin and what the server list says about them. only what anyone
+   can already see in the game's server list; nothing from the whitelist */
+function fillPlayerPanel(name) {
+    const servers = lastStatus ? lastStatus.servers.filter(function (server) {
+        return server.players && server.players.names.includes(name);
+    }) : [];
+    // floodgate puts a dot in front of Bedrock names
+    const isBedrock = name.startsWith(".");
+
+    document.querySelector("#panel-player-title").textContent = name;
+    document.querySelector("#panel-player-body").replaceChildren(playerCard(name, null, [
+        ["edition", isBedrock ? "Bedrock" : "Java"],
+        ["status", "online now"],
+        ["playing on", servers.length ? servers.map(function (server) { return server.name; }).join(", ") : "DS Network"]
+    ]));
+    const buttons = [h("button", { class: "mc-button", type: "button", "data-panel": "status" }, "Server List")];
+    if (!isBedrock) buttons.unshift(h("a", { class: "mc-button", href: "https://namemc.com/profile/" + encodeURIComponent(name), target: "_blank", rel: "noopener" }, "NameMC ↗"));
+    document.querySelector("#panel-player-buttons").replaceChildren(...buttons);
+}
+
 // which popup a link opens
 function panelFor(tab) {
     if (tab.classList.contains("nav-logo")) return "contact";
@@ -61,7 +82,7 @@ function panelFor(tab) {
 
 /* open and close, like the contact site's who? / links? */
 function showPanel(panelName) {
-    const isPanelName = panelName === "status" || panelName === "join" || panelName === "contact";
+    const isPanelName = ["status", "join", "contact", "player"].includes(panelName);
 
     if (isPanelName) {
         panels.forEach(function (panel) {
@@ -127,6 +148,26 @@ document.addEventListener("status", function (e) {
 
 window.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && veil.classList.contains("is-open")) closePanel();
+});
+
+/* a named head in the hotbar opens its player, by click, tap, Enter or Space */
+function openPlayer(slot) {
+    lastClickedTab = slot;
+    hotbarTip.hidden = true;
+    fillPlayerPanel(slot.dataset.name);
+    showPanel("player");
+}
+
+hotbar.addEventListener("click", function (e) {
+    const slot = e.target.closest(".slot[data-name]:not(.is-hidden)");
+    if (slot) openPlayer(slot);
+});
+
+hotbar.addEventListener("keydown", function (e) {
+    const slot = e.target.closest(".slot[data-name]:not(.is-hidden)");
+    if (!slot || (e.key !== "Enter" && e.key !== " ")) return;
+    e.preventDefault();
+    openPlayer(slot);
 });
 
 if (location.hash === "#join") showPanel("join");

@@ -190,9 +190,21 @@
 
     </main>
 
-    <!-- the confirm popup, drawn like the game's menu screens, the same as the popups on the main page (admin.js) -->
+    <!-- the popups, drawn like the game's menu screens, the same as the popups on the main page (admin.js):
+         a player, and the confirm question -->
     <div class="veil" id="veil" aria-hidden="true">
-        <section class="panel is-confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+        <!-- a player: their whole skin and what is known about them (admin.js) -->
+        <section class="panel is-player" id="panel-player" role="dialog" aria-modal="true" aria-labelledby="panel-player-title" hidden>
+            <div class="panel-head">
+                <h2 id="panel-player-title">Player</h2>
+                <button class="mc-close" type="button" data-close aria-label="Close">&#10005;</button>
+            </div>
+            <div class="panel-body" id="panel-player-body"></div>
+            <div class="panel-buttons" id="panel-player-buttons"></div>
+        </section>
+
+        <!-- the question before a change that can't be taken back with one click -->
+        <section class="panel is-confirm" id="panel-confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
             <div class="panel-head">
                 <h2 id="confirm-title">Are you sure?</h2>
                 <button class="mc-close" type="button" data-answer="no" aria-label="Cancel">&#10005;</button>
