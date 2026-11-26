@@ -91,7 +91,6 @@ function buildWorld() {
     }
 }
 
-buildWorld();
 
 // the camera stands on a hill near the middle at eye height, with a clear view all round
 function placeCamera() {
@@ -122,7 +121,8 @@ function placeCamera() {
     return { x: best.x + 0.5, y: best.y + 0.5, z: surface[best.y * worldSize + best.x] + 4.5 };
 }
 
-const camera = placeCamera();
+// built on the first draw, not when the page loads: the admin page doesn't need it once you're logged in
+let camera = null;
 
 /* how a block face looks (0 = background, 1 = brightest) */
 
@@ -245,6 +245,14 @@ function readColors() {
     isNight = window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
+/* hidden (the admin page once you're logged in): nothing is drawn, and a draw that was going stops.
+   forgetting the drawn size makes it draw again as soon as it shows */
+function isHidden() {
+    if (panorama.getClientRects().length) return false;
+    drawnWidth = 0;
+    return true;
+}
+
 /* 4 css px per panorama pixel at the designed 16 px text size (3 on phones), scaled with the
    page so Windows display scaling doesn't change the look, then rounded to whole device
    pixels so the blocks stay sharp at 125 % / 150 % too */
@@ -257,6 +265,11 @@ function measurePixelSize() {
 
 /* renders the whole 360° strip, a chunk of columns at a time, starting where the view starts */
 function drawPanorama() {
+    if (isHidden()) return;
+    if (!camera) {
+        buildWorld();
+        camera = placeCamera();
+    }
     const thisJob = ++drawJob;
     readColors();
     pixelSize = measurePixelSize();
@@ -277,12 +290,12 @@ function drawPanorama() {
 
     const strip = panoramaContext.createImageData(1, rows);
     let column = 0;
-    const columnsPerChunk = 12;
 
+    // a few ms of columns at a time, so the page stays smooth while it draws, on slow machines too
     function chunk() {
-        if (thisJob !== drawJob) return;
-        const until = Math.min(columns, column + columnsPerChunk);
-        for (; column < until; column++) {
+        if (thisJob !== drawJob || isHidden()) return;
+        const until = performance.now() + 8;
+        for (; column < columns && performance.now() < until; column++) {
             const yaw = column / columns * Math.PI * 2;
             const cos = Math.cos(yaw), sin = Math.sin(yaw);
             for (let row = 0; row < rows; row++) {

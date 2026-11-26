@@ -1,9 +1,16 @@
 /*shared by both pages: talking to the API, building elements safely, the big title*/
 
 /*calls the API and returns the JSON, or throws an Error with the API's own message*/
+/* the last answer to each GET, with its fingerprint: asking again with it gets an empty
+   "nothing changed" (304) when it is still the same, so the same data isn't downloaded twice */
+const lastAnswers = new Map();
+
 async function api(path, options = {}) {
     const headers = { ...(options.headers || {}) };
     if (options.body !== undefined) headers["Content-Type"] = "application/json";
+    const isGet = !options.method || options.method === "GET";
+    const last = isGet ? lastAnswers.get(path) : null;
+    if (last) headers["If-None-Match"] = last.etag;
 
     let response;
     try {
@@ -18,10 +25,16 @@ async function api(path, options = {}) {
         throw error;
     }
 
+    if (response.status === 304 && last) return JSON.parse(last.text);
+
+    const text = await response.text();
     let data = {};
     try {
-        data = await response.json();
+        data = JSON.parse(text);
     } catch (notJson) { }
+
+    const etag = response.headers.get("ETag");
+    if (isGet && response.ok && etag) lastAnswers.set(path, { etag: etag, text: text });
 
     if (!response.ok) {
         const error = new Error(data.error || "something went wrong (" + response.status + ")");

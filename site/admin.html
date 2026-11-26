@@ -47,8 +47,9 @@
         <div class="notice" id="notice" role="status" hidden></div>
 
         <!-- the login screen, like the game's title screen: the big title and a login window over the
-             turning world (panorama.js). once logged in it goes away and the title shrinks into the numbers row -->
-        <div class="hero login-screen" id="login-screen">
+             turning world (panorama.js). it only shows when there is no working token (admin.js), so a
+             remembered login goes straight to the lists without drawing the world -->
+        <div class="hero login-screen" id="login-screen" hidden>
             <div class="panorama" aria-hidden="true"></div>
 
             <div class="row title compact" data-state="online">

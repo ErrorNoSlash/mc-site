@@ -21,9 +21,20 @@ class HttpError extends Error {
     }
 }
 
-function send(res, status, body, headers = {}) {
+// a GET answer carries a fingerprint of its content (ETag); when the page already has that exact
+// answer it gets an empty 304 back instead of the same data again
+function send(res, status, body, headers = {}, req = null) {
+    const text = JSON.stringify(body);
+    if (req?.method === "GET" && status === 200) {
+        const etag = `"${crypto.createHash("sha1").update(text).digest("base64url")}"`;
+        res.setHeader("ETag", etag);
+        if (req.headers["if-none-match"] === etag) {
+            res.writeHead(304, headers);
+            return res.end();
+        }
+    }
     res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", ...headers });
-    res.end(JSON.stringify(body));
+    res.end(text);
 }
 
 function clientIp(req) {
@@ -305,7 +316,8 @@ function applyCors(req, res) {
     const origin = req.headers.origin;
     if (origin && config.allowedOrigins.includes(origin)) {
         res.setHeader("Access-Control-Allow-Origin", origin);
-        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, If-None-Match");
+        res.setHeader("Access-Control-Expose-Headers", "ETag");
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         res.setHeader("Access-Control-Max-Age", "600");
     }
@@ -328,7 +340,7 @@ const server = http.createServer(async (req, res) => {
             const match = url.pathname.match(pattern);
             if (match && method === req.method) {
                 const body = await handler(req, res, url, match.slice(1));
-                return send(res, res.statusCode || 200, body);
+                return send(res, res.statusCode || 200, body, {}, req);
             }
         }
         throw new HttpError(404, "Not found.");
