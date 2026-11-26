@@ -1,6 +1,9 @@
 /*admin page: approve requests, manage the whitelist, turn it on and off.
-  on phones and tablets it is split into three pages, picked with the tabs under the menu*/
-const tokenStorageKey = "whitelistAdminToken";
+  on phones and tablets it is split into three pages, picked with the tabs under the menu.
+  logging in swaps the token for a session cookie the page itself can't read; the token is never kept*/
+
+// where older versions of this page kept the token: cleared on every visit
+const oldTokenKey = "whitelistAdminToken";
 
 const loginScreen = document.querySelector("#login-screen");
 const pageTabs = document.querySelectorAll(".admin-tabs [data-show]");
@@ -20,7 +23,7 @@ const confirmTitle = document.querySelector("#confirm-title");
 const confirmText = document.querySelector("#confirm-text");
 const confirmYes = document.querySelector("#confirm-yes");
 
-let token = "";
+let isLoggedIn = false;
 let overview = null;
 let renderedKey = "";
 let messageDirty = false;
@@ -28,32 +31,25 @@ let noticeTimer = null;
 let answerConfirm = null;
 let focusBeforeConfirm = null;
 
-/* token */
+/* login */
 
-function storedToken() {
+function forgetOldToken() {
     try {
-        return sessionStorage.getItem(tokenStorageKey) || localStorage.getItem(tokenStorageKey) || "";
-    } catch (storageOff) {
-        return "";
-    }
-}
-
-function storeToken(value, remember) {
-    try {
-        sessionStorage.setItem(tokenStorageKey, value);
-        if (remember) localStorage.setItem(tokenStorageKey, value);
+        sessionStorage.removeItem(oldTokenKey);
+        localStorage.removeItem(oldTokenKey);
     } catch (storageOff) { }
 }
 
-function forgetToken() {
-    try {
-        sessionStorage.removeItem(tokenStorageKey);
-        localStorage.removeItem(tokenStorageKey);
-    } catch (storageOff) { }
-}
-
+// admin calls carry the session cookie
 function adminApi(path, options = {}) {
-    return api(path, { ...options, headers: { Authorization: "Bearer " + token } });
+    return api(path, { ...options, credentials: "include" });
+}
+
+/*the reason a call was turned away, in words for the login screen*/
+function loginProblem(error) {
+    if (error.status === 403 && error.data && error.data.reason === "network") return "the admin only works from home or over the VPN";
+    if (error.status === 429) return "too many wrong tries, wait a while";
+    return error.message;
 }
 
 function showLogin(message) {
@@ -114,7 +110,8 @@ async function act(promise, success) {
         if (success) flash(success);
     } catch (error) {
         if (error.status === 401) {
-            showLogin("the token stopped working, log in again");
+            isLoggedIn = false;
+            showLogin("your login ran out, log in again");
             return false;
         }
         flash(error.message, true);
@@ -371,20 +368,21 @@ function render(data) {
     }
 }
 
+/*loads everything; without a valid session cookie that is the login screen*/
 async function load() {
-    if (!token) return showLogin();
     try {
         render(await adminApi("/api/admin/overview"));
+        isLoggedIn = true;
         loginScreen.hidden = true;
         adminView.hidden = false;
         logoutButton.hidden = false;
     } catch (error) {
         if (error.status === 401) {
-            forgetToken();
-            token = "";
-            return showLogin("that token isn't right");
+            const wasLoggedIn = isLoggedIn;
+            isLoggedIn = false;
+            return showLogin(wasLoggedIn ? "your login ran out, log in again" : "");
         }
-        if (adminView.hidden) showLogin(error.message);
+        if (adminView.hidden) showLogin(loginProblem(error));
         else flash(error.message, true);
     }
 }
@@ -393,20 +391,29 @@ async function load() {
 
 loginForm.addEventListener("submit", async function (e) {
     e.preventDefault();
-    token = loginForm.elements.token.value.trim();
+    const token = loginForm.elements.token.value.trim();
+    const remember = loginForm.elements.remember.checked;
+    // the token leaves the field straight away; only the cookie the API answers with stays
+    loginForm.elements.token.value = "";
     loginOutput.dataset.tone = "wait";
     loginOutput.replaceChildren(h("span", null, "> checking..."));
-    await load();
-    if (!adminView.hidden) {
-        storeToken(token, loginForm.elements.remember.checked);
-        loginForm.reset();
-        loginOutput.replaceChildren();
+    try {
+        await adminApi("/api/admin/login", { method: "POST", body: { token: token, remember: remember } });
+    } catch (error) {
+        loginOutput.dataset.tone = "error";
+        loginOutput.replaceChildren(h("span", null, "> " + (error.status === 401 ? "that token isn't right" : loginProblem(error))));
+        return;
     }
+    loginOutput.replaceChildren();
+    loginForm.reset();
+    await load();
 });
 
-logoutButton.addEventListener("click", function () {
-    forgetToken();
-    token = "";
+logoutButton.addEventListener("click", async function () {
+    try {
+        await adminApi("/api/admin/logout", { method: "POST", body: {} });
+    } catch (error) { }
+    isLoggedIn = false;
     overview = null;
     renderedKey = "";
     showLogin();
@@ -496,8 +503,8 @@ window.addEventListener("keydown", function (e) {
 /* start */
 
 setTitleWord("ADMIN");
-token = storedToken();
+forgetOldToken();
 load();
 setInterval(function () {
-    if (token && !document.hidden && !adminView.hidden) load();
+    if (isLoggedIn && !document.hidden && !adminView.hidden) load();
 }, 20000);

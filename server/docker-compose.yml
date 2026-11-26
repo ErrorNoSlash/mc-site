@@ -1,10 +1,14 @@
 name: minecraft
 
+# every download is pinned to one version, so a restart never pulls in something new by surprise.
+# to update: change the version here on purpose (Dependabot opens a PR for the image tags).
+#   fabricproxy-lite nR8AIdvx = v2.11.0 (for 1.21.11) · fabric loader 0.20.1
 x-fabric-proxy-env: &fabric-proxy-env
   VELOCITY_FORWARDING_SECRET: "${VELOCITY_SECRET:?velocity secret required}"
   FABRIC_PROXY_SECRET: "${VELOCITY_SECRET:?velocity secret required}"
+  FABRIC_LOADER_VERSION: "0.20.1"
   MODRINTH_PROJECTS: |
-    fabricproxy-lite
+    fabricproxy-lite:nR8AIdvx
 
 configs:
   velocity-toml:
@@ -129,17 +133,23 @@ configs:
 services:
   velocity:
     container_name: "Velocity"
-    image: itzg/mc-proxy:java25
+    image: itzg/mc-proxy:2026.11.2-java25
     environment:
       TYPE: "VELOCITY"
       MINECRAFT_VERSION: "26.1.2"
+      # pinned: Velocity 4.3.1 build 45 · viaversion Fkfcr89K = 5.12.2 · viabackwards WFO37e8T = 5.12.2 ·
+      # smartrejoin v6EKVYwb = 1.4.2 · Geyser 2.12.1 build 1309 · Floodgate 2.2.5 build 141.
+      # a new Bedrock version needs a newer Geyser: bump its version and build here
+      # (newest: https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest)
+      VELOCITY_VERSION: "4.3.1"
+      VELOCITY_BUILD_ID: "45"
       MODRINTH_PROJECTS: |
-        viaversion
-        viabackwards
-        smartrejoin
+        viaversion:Fkfcr89K
+        viabackwards:WFO37e8T
+        smartrejoin:v6EKVYwb
       PLUGINS: |
-        https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/velocity
-        https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/velocity
+        https://download.geysermc.org/v2/projects/geyser/versions/2.12.1/builds/1309/downloads/velocity
+        https://download.geysermc.org/v2/projects/floodgate/versions/2.2.5/builds/141/downloads/velocity
     configs:
       - source: velocity-toml
         target: /config/velocity.toml
@@ -156,7 +166,7 @@ services:
 
   mc-limbo:
     container_name: "MC-limbo"
-    image: itzg/minecraft-server
+    image: itzg/minecraft-server:2026.11.1
     environment:
       EULA: "TRUE"
       TYPE: "NANOLIMBO"
@@ -174,7 +184,7 @@ services:
 
   mc-survival:
     container_name: "MC-survival"
-    image: itzg/minecraft-server
+    image: itzg/minecraft-server:2026.11.1
     environment:
       EULA: "TRUE"
       TYPE: "FABRIC"
@@ -189,7 +199,7 @@ services:
 
   mc-anarchy:
     container_name: "MC-anarchy"
-    image: itzg/minecraft-server
+    image: itzg/minecraft-server:2026.11.1
     environment:
       EULA: "TRUE"
       TYPE: "FABRIC"
@@ -204,7 +214,7 @@ services:
 
   mc-survival-old:
     container_name: "MC-survival-old"
-    image: itzg/minecraft-server
+    image: itzg/minecraft-server:2026.11.1
     environment:
       EULA: "TRUE"
       TYPE: "FABRIC"
@@ -231,6 +241,9 @@ services:
       ALLOWED_ORIGINS: "https://join.errornoslash.be,https://ntfy.errornoslash.be"
       # Nginx Proxy Manager passes the visitor's address in X-Real-IP
       CLIENT_IP_HEADER: "x-real-ip"
+      # the admin only answers from these networks: the home network and Tailscale (IPv4 + IPv6).
+      # using WireGuard on OPNsense instead? add its tunnel network, e.g. "10.10.10.0/24"
+      ADMIN_NETWORKS: "10.0.0.0/24, 100.64.0.0/10, fd7a:115c:a1e0::/48"
       # first entry = the proxy everyone joins through; limbo is left out on purpose
       STATUS_SERVERS: "DS Network=velocity:25565, survival=mc-survival:25565, survival-old=mc-survival-old:25565, anarchy=mc-anarchy:25565"
       # your own ntfy, straight over the Internal network (no TLS, no public hop)

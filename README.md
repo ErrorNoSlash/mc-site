@@ -116,7 +116,7 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | **workflows**  | every action pinned to a full commit SHA, no permissions by default, Dependabot weekly |
 | **plugin jar** | built in GitHub Actions with a signed build-provenance attestation                    |
 | **container**  | Node 26 LTS, unprivileged user, read-only filesystem, no Linux capabilities           |
-| **admin**      | token only ever in a header, compared in constant time, wrong guesses rate-limited    |
+| **admin**      | only from home or Tailscale; the token is swapped for an HttpOnly session cookie, never stored; 10 wrong tries lock an address out for 15 min |
 | **requests**   | Java names checked with Mojang, 3 an hour per address, a hidden field for bots        |
 | **whitelist**  | Java by UUID, Bedrock by Floodgate name (Java names can't contain the dot)            |
 | **ntfy buttons** | signed links that work once and expire after 7 days                                 |
@@ -134,13 +134,15 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | `POST`   | `/api/requests` `{edition, name, note}`     | anyone           |
 | `GET`    | `/api/requests/lookup?edition=&name=`       | anyone           |
 | `POST`   | `/api/act/:id/approve\|deny?exp=&sig=`      | signed ntfy link |
-| `GET`    | `/api/admin/overview`                       | token            |
-| `POST`   | `/api/admin/requests/:id/approve\|deny`     | token            |
-| `DELETE` | `/api/admin/requests/:id`                   | token            |
-| `POST`   | `/api/admin/players` `{edition, name}`      | token            |
-| `DELETE` | `/api/admin/players/:key`                   | token            |
-| `PUT`    | `/api/admin/settings` `{enforced, message}` | token            |
-| `POST`   | `/api/admin/test-notification`              | token            |
+| `POST`   | `/api/admin/login` `{token, remember}`      | token → cookie   |
+| `POST`   | `/api/admin/logout`                         | session          |
+| `GET`    | `/api/admin/overview`                       | session / token  |
+| `POST`   | `/api/admin/requests/:id/approve\|deny`     | session / token  |
+| `DELETE` | `/api/admin/requests/:id`                   | session / token  |
+| `POST`   | `/api/admin/players` `{edition, name}`      | session / token  |
+| `DELETE` | `/api/admin/players/:key`                   | session / token  |
+| `PUT`    | `/api/admin/settings` `{enforced, message}` | session / token  |
+| `POST`   | `/api/admin/test-notification`              | session / token  |
 
 | variable                    | default                     | meaning                                          |
 | --------------------------- | --------------------------- | ------------------------------------------------ |
@@ -149,6 +151,9 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | `ALLOWED_ORIGINS`           | required                    | origins allowed to call the API                  |
 | `PUBLIC_API_URL`            |                             | the API's https address, for the ntfy buttons    |
 | `CLIENT_IP_HEADER`          |                             | the header holding the visitor's address         |
+| `ADMIN_NETWORKS`            | anywhere                    | networks the admin works from, `10.0.0.0/24, …`  |
+| `SESSION_HOURS`             | `12`                        | how long a login lasts                           |
+| `REMEMBER_DAYS`             | `30`                        | the same with "remember on this device"          |
 | `STATUS_SERVERS`            | `DS Network=velocity:25565` | `name=host:port, …`; the first is the proxy      |
 | `STATUS_CACHE_SECONDS`      | `15`                        | how often the servers are pinged at most         |
 | `STATUS_SHOW_PLAYERS`       | `true`                      | show online player names                         |
@@ -159,7 +164,7 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | `NTFY_TOPIC` / `NTFY_TOKEN` |                             | the topic and access token                       |
 | `NTFY_PRIORITY`             | `3`                         | 1 to 5; compose sets `4` so requests buzz        |
 
-Data lives in `/data/minecraft/whitelist/` (`requests.json`, `whitelist.json`). Back it up with the worlds.
+Data lives in `/data/minecraft/whitelist/` (`requests.json`, `whitelist.json`). `mc-backup` ([`server/backup.fish`](server/backup.fish)) backs it up with the worlds: `mc-backup` for everything, `mc-backup survival anarchy` for some, `--list`, `--keep N`, `--to DIR`, `--restore NAME`.
 
 </details>
 

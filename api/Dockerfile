@@ -1,5 +1,5 @@
-# Node 26 is the current LTS (supported until Oct 2027); Dependabot proposes newer images
-FROM node:26-alpine
+# Node 26 is the current LTS; pinned to one exact image, Dependabot proposes newer ones
+FROM node:26.12.1-alpine3.24
 
 WORKDIR /app
 COPY package.json ./

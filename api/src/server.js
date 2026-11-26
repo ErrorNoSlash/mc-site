@@ -2,6 +2,7 @@
 // No dependencies: Node's own http, fetch and crypto.
 
 import http from "node:http";
+import net from "node:net";
 import crypto from "node:crypto";
 import { config, checkConfig } from "./config.js";
 import * as store from "./store.js";
@@ -69,6 +70,16 @@ async function readJsonBody(req) {
 
 /* fixed-window rate limits kept in memory */
 const buckets = new Map();
+
+// throws while a limit is used up, without counting this try (for the admin lockout: checked before the token)
+function checkLimit(name, key, limit) {
+    const bucket = buckets.get(`${name}:${key}`);
+    if (bucket && bucket.resetAt > Date.now() && bucket.count >= limit) {
+        const wait = Math.ceil((bucket.resetAt - Date.now()) / 1000);
+        throw new HttpError(429, "Too many wrong tries, wait a while.", { retryAfter: wait });
+    }
+}
+
 function rateLimit(name, key, limit, windowSeconds) {
     const id = `${name}:${key}`;
     const now = Date.now();
@@ -86,14 +97,86 @@ function rateLimit(name, key, limit, windowSeconds) {
 setInterval(() => {
     const now = Date.now();
     for (const [id, bucket] of buckets) if (bucket.resetAt <= now) buckets.delete(id);
+    for (const [id, session] of sessions) if (session.expires <= now) sessions.delete(id);
 }, 60_000).unref();
 
+/* ---------- admin access ---------- */
+
+// the networks the admin works from (ADMIN_NETWORKS); everything else gets a 403 before the token is even looked at
+const adminNetworks = new net.BlockList();
+for (const network of config.adminNetworks) {
+    const [address, prefix] = network.split("/");
+    try {
+        adminNetworks.addSubnet(address, Number(prefix), net.isIPv6(address) ? "ipv6" : "ipv4");
+    } catch {
+        // a typo: checkConfig() names it and stops the API at startup
+    }
+}
+
+function fromAdminNetwork(req) {
+    if (config.adminNetworks.length === 0) return true;
+    const ip = clientIp(req).replace(/^::ffff:/, "");
+    const type = net.isIPv6(ip) ? "ipv6" : net.isIPv4(ip) ? "ipv4" : null;
+    return Boolean(type) && adminNetworks.check(ip, type);
+}
+
+// 10 wrong tokens from one address lock it out for 15 minutes; checked before the token is compared
+const lockout = { name: "admin-fail", limit: 10, seconds: 15 * 60 };
+
+function tokenMatches(value) {
+    const given = Buffer.from(String(value || ""));
+    const expected = Buffer.from(config.adminToken);
+    return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+}
+
+/* logins: the token is swapped once for a random session id in a cookie that scripts can't read
+   (HttpOnly), that only travels over https (Secure) and only from the site itself (SameSite=Strict).
+   the __Host- prefix means no other subdomain can set or replace it. sessions live in memory:
+   restarting the API logs everyone out */
+const sessionCookie = "__Host-mc_admin";
+const sessions = new Map();
+
+function readSessionId(req) {
+    const cookies = String(req.headers.cookie || "").split(";").map((part) => part.trim());
+    const found = cookies.find((part) => part.startsWith(sessionCookie + "="));
+    return found ? found.slice(sessionCookie.length + 1) : "";
+}
+
+function startSession(res, remember) {
+    const id = crypto.randomBytes(32).toString("base64url");
+    const lifetime = remember ? config.rememberDays * 86400 : config.sessionHours * 3600;
+    sessions.set(id, { expires: Date.now() + lifetime * 1000 });
+    // without "remember" the cookie goes when the browser closes; the server forgets it after sessionHours anyway
+    const maxAge = remember ? `; Max-Age=${lifetime}` : "";
+    res.setHeader("Set-Cookie", `${sessionCookie}=${id}; Path=/; Secure; HttpOnly; SameSite=Strict${maxAge}`);
+}
+
+function endSession(req, res) {
+    sessions.delete(readSessionId(req));
+    res.setHeader("Set-Cookie", `${sessionCookie}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0`);
+}
+
+function hasSession(req) {
+    const session = sessions.get(readSessionId(req));
+    return Boolean(session) && session.expires > Date.now();
+}
+
+/* every admin route: a session cookie, or the token as "Authorization: Bearer" (for scripts and curl).
+   a change made with the cookie must come from the site itself (Origin), on top of SameSite */
 function requireAdmin(req) {
     const ip = clientIp(req);
-    const given = Buffer.from(String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""));
-    const expected = Buffer.from(config.adminToken);
-    if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
-        rateLimit("admin-fail", ip, 10, 15 * 60);
+    if (hasSession(req)) {
+        const origin = req.headers.origin;
+        if (req.method !== "GET" && !config.allowedOrigins.includes(origin)) {
+            throw new HttpError(403, "Changes only work from the admin page.");
+        }
+        return;
+    }
+    const bearer = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    if (!bearer) throw new HttpError(401, "Log in first.");
+    checkLimit(lockout.name, ip, lockout.limit);
+    if (!tokenMatches(bearer)) {
+        rateLimit(lockout.name, ip, lockout.limit, lockout.seconds);
         throw new HttpError(401, "Wrong admin token.");
     }
 }
@@ -231,6 +314,25 @@ route("POST", /^\/api\/act\/([\w-]+)\/(approve|deny)$/, async (req, res, url, [i
 
 /* ---------- admin ---------- */
 
+route("POST", /^\/api\/admin\/login$/, async (req, res) => {
+    const ip = clientIp(req);
+    checkLimit(lockout.name, ip, lockout.limit);
+    const body = await readJsonBody(req);
+    if (!tokenMatches(String(body.token || "").trim())) {
+        rateLimit(lockout.name, ip, lockout.limit, lockout.seconds);
+        log("admin: wrong token from", hashIp(ip));
+        throw new HttpError(401, "Wrong admin token.");
+    }
+    startSession(res, body.remember === true);
+    log("admin: logged in from", hashIp(ip), body.remember === true ? "(remembered)" : "");
+    return { ok: true };
+});
+
+route("POST", /^\/api\/admin\/logout$/, (req, res) => {
+    endSession(req, res);
+    return { ok: true };
+});
+
 route("GET", /^\/api\/admin\/overview$/, (req) => {
     requireAdmin(req);
     const whitelist = store.getWhitelist();
@@ -316,6 +418,7 @@ function applyCors(req, res) {
     const origin = req.headers.origin;
     if (origin && config.allowedOrigins.includes(origin)) {
         res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Access-Control-Allow-Credentials", "true");
         res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, If-None-Match");
         res.setHeader("Access-Control-Expose-Headers", "ETag");
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -340,6 +443,10 @@ const server = http.createServer(async (req, res) => {
 
     const url = new URL(req.url, "http://localhost");
     try {
+        // the admin only answers on the home network and the VPN (ADMIN_NETWORKS)
+        if (url.pathname.startsWith("/api/admin/") && !fromAdminNetwork(req)) {
+            throw new HttpError(403, "The admin only works from home or over the VPN.", { reason: "network" });
+        }
         for (const { method, pattern, handler } of routes) {
             const match = url.pathname.match(pattern);
             if (match && method === req.method) {
@@ -374,6 +481,7 @@ try {
 server.listen(config.port, () => {
     const whitelist = store.getWhitelist();
     log(`whitelist API on :${config.port}, ${whitelist.players.length} players, enforced=${whitelist.enforced}, ntfy=${ntfyEnabled() ? config.ntfy.topic : "off"}`);
+    log(config.adminNetworks.length ? `admin only from ${config.adminNetworks.join(", ")}` : "admin from anywhere (ADMIN_NETWORKS is empty)");
 });
 
 for (const signal of ["SIGTERM", "SIGINT"]) {

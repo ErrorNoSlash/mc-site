@@ -28,6 +28,12 @@ export const config = {
     publicApiUrl: trimSlash(env.PUBLIC_API_URL),
     clientIpHeader: (env.CLIENT_IP_HEADER || "").trim().toLowerCase(),
 
+    // the networks the admin works from (home, VPN), e.g. "10.0.0.0/24, 100.64.0.0/10"; empty = anywhere
+    adminNetworks: list(env.ADMIN_NETWORKS),
+    // how long a login lasts: until the browser closes (at most this many hours), or with "remember" this many days
+    sessionHours: Number(env.SESSION_HOURS) || 12,
+    rememberDays: Number(env.REMEMBER_DAYS) || 30,
+
     dataDir: env.DATA_DIR || "/data",
     pluginDir: env.PLUGIN_DIR || "/plugin",
 
@@ -57,6 +63,11 @@ export function checkConfig() {
     }
     if (config.allowedOrigins.length === 0) {
         problems.push("ALLOWED_ORIGINS must list the site's origin, e.g. https://join.errornoslash.be");
+    }
+    for (const network of config.adminNetworks) {
+        if (!/^[\d.]+\/\d{1,2}$|^[\da-f:]+\/\d{1,3}$/i.test(network)) {
+            problems.push(`ADMIN_NETWORKS: "${network}" is not a network like 10.0.0.0/24`);
+        }
     }
     if (config.servers.length === 0) {
         problems.push("STATUS_SERVERS must list at least the proxy, e.g. DS Network=velocity:25565");
