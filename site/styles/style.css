@@ -2112,6 +2112,75 @@ body.popup-open .sheet :is(*, *::before, *::after) {
     animation: splash-new 0.35s var(--ease-pop), splash 0.5s 0.35s ease-in-out infinite alternate;
 }
 
+/* preloader: the contact site's preloader, drawn like the game's loading screen. a blocky bar that
+   fills in segments, the loading step in the pixel font above it. above everything, the cursor too */
+.preloader {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    padding: clamp(0.5rem, 2vw, 1.5rem);
+    background: var(--texture) 0 0 / 2rem 2rem, var(--background);
+    transition: opacity 0.45s, visibility 0s 0.45s;
+
+    &.is-done {
+        opacity: 0;
+        visibility: hidden;
+    }
+
+    .preloader-frame {
+        flex: 1;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        border: var(--line-width) solid var(--line-color);
+    }
+
+    .preloader-box {
+        width: min(24rem, 100%);
+        font-weight: 700;
+    }
+
+    .preloader-text {
+        margin: 0 0 1.75rem;
+        font-size: 0.8125rem;
+        white-space: nowrap;
+        opacity: 0.6;
+    }
+
+    /* the loading step, the way the game writes it above its bar */
+    .preloader-stage {
+        margin: 0 0 0.75rem;
+        font: 500 1.25rem / 1 var(--font-pixel);
+        text-align: center;
+    }
+
+    /* square, like the game's bar; the fill is a row of blocks */
+    .preloader-bar {
+        height: 1.375rem;
+        padding: 0.1875rem;
+        border: 0.125rem solid var(--foreground);
+    }
+
+    .preloader-fill {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: repeating-linear-gradient(90deg, var(--foreground) 0 0.75rem, transparent 0.75rem 0.9375rem);
+    }
+
+    .preloader-count {
+        margin: 0.5rem 0 0;
+        text-align: right;
+        font: 700 clamp(3rem, 12vw, 6rem) / 1 var(--font-pixel);
+    }
+}
+
+/* set by firstPaint.js when this browser has already seen the preloader once, so it is skipped */
+.is-returning .preloader {
+    display: none;
+}
+
 /* cursor (fine pointers only): the contact site's cursor, drawn like the game's crosshair and block outline.
    sized in px, not rem: the page's text grows and shrinks with the window, the cursor stays the same */
 .cursor-dot,

@@ -3,6 +3,9 @@
 
 <head>
     <meta charset="UTF-8">
+    <!-- security: only load scripts, styles, fonts and pictures from this site and the few places named here,
+         always over https -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://mc-heads.net; connect-src 'self' https://mc-api.errornoslash.be; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>DS Network · admin</title>
     <meta name="robots" content="noindex, nofollow">
@@ -11,6 +14,9 @@
     <meta name="theme-color" content="#040507" media="(prefers-color-scheme: dark)">
 
     <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+
+    <!-- runs first: sends a plain http visit to https (firstPaint.js) -->
+    <script src="scripts/firstPaint.js"></script>
 
     <!--Google Fonts-->
     <link rel="preconnect" href="https://fonts.googleapis.com">

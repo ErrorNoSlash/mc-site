@@ -3,6 +3,10 @@
 
 <head>
     <meta charset="UTF-8">
+    <!-- security: only load scripts, styles, fonts and pictures from this site and the few places named here,
+         always over https -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://mc-heads.net; connect-src 'self' https://mc-api.errornoslash.be; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>DS Network · Minecraft</title>
     <meta name="description" content="DS Network, a small whitelisted Minecraft server for Java and Bedrock. See if it's online and ask to join.">
@@ -29,6 +33,9 @@
 
     <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 
+    <!-- runs first: https, and whether this browser has seen the preloader -->
+    <script src="scripts/firstPaint.js"></script>
+
     <!--Google Fonts-->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,6 +45,7 @@
     <link rel="stylesheet" href="styles/style.css">
 
     <!-- JS scripts -->
+    <script src="scripts/preloader.js" defer></script>
     <script src="scripts/config.js" defer></script>
     <script src="scripts/common.js" defer></script>
     <script src="scripts/cursor.js" defer></script>
@@ -48,6 +56,21 @@
 </head>
 
 <body class="fit">
+    <!-- the preloader, like the game's loading screen; only on the first visit in this browser (preloader.js) -->
+    <div class="preloader" id="preloader" aria-hidden="true">
+        <div class="preloader-frame">
+            <div class="preloader-box">
+                <p class="preloader-text">dias@mc:~$ /join ds network<span class="caret"></span></p>
+                <p class="preloader-stage" id="preloader-stage">Generating world</p>
+                <div class="preloader-bar"><span class="preloader-fill" id="preloader-fill"></span></div>
+                <p class="preloader-count"><span id="preloader-count">0</span>%</p>
+            </div>
+        </div>
+    </div>
+    <noscript>
+        <style>.preloader { display: none; }</style>
+    </noscript>
+
     <!-- the cursor: a crosshair + a block outline (cursor.js, mouse only) -->
     <div class="cursor-dot" data-cursor-dot></div>
     <div class="cursor-outline" data-cursor-outline></div>
