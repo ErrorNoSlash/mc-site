@@ -1012,7 +1012,7 @@ body.popup-open .sheet :is(*, *::before, *::after) {
     }
 
     /* a focused field marks itself inside its own edge, so nothing sticks out past the buttons */
-    #panel-form .field :is(input, textarea):focus {
+    .field :is(input, textarea):focus {
         box-shadow: inset 0 0 0 0.125rem var(--foreground);
     }
 
@@ -1154,6 +1154,7 @@ body.popup-open .sheet :is(*, *::before, *::after) {
 /* a game menu button: flat face, light top-left edge, dark bottom-right edge, inverted when pointed at */
 .mc-button {
     flex: 1 1 8rem;
+    text-align: center;
     padding: 0.6rem 1rem 0.7rem;
     border: 0.125rem solid var(--foreground);
     background: var(--surface);
@@ -1265,16 +1266,43 @@ body.popup-open .sheet :is(*, *::before, *::after) {
 }
 
 /* admin page */
-.login {
-    display: grid;
-    align-content: start;
-    gap: 0.9rem;
-    width: min(100%, 34rem);
-    padding: clamp(1rem, 3vw, 2rem) var(--pad);
 
-    & p {
-        margin: 0;
+/* the login screen: the title and the login window fill the window over the turning world */
+.login-screen {
+    flex: 1 0 auto;
+
+    /* the world fills a lot more of the window here than on the main page, so it stays quieter
+       behind the login window */
+    .panorama {
+        opacity: 0.55;
     }
+}
+
+/* the window sits in the middle of the world, like the menu buttons on the game's title screen */
+.login-view {
+    flex: 1 0 auto;
+    place-items: center;
+    padding: clamp(1.5rem, 6vh, 4rem) var(--pad);
+}
+
+/* the login window: a little narrower than the popups */
+.panel.login {
+    width: min(30rem, 100%);
+    animation: none;
+
+    .panel-body {
+        display: grid;
+        gap: 0.9rem;
+        padding-bottom: 0.25rem;
+    }
+}
+
+/* the line about where the token comes from */
+.login-text {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    opacity: 0.75;
 }
 
 /* checkbox with its label */
@@ -1390,6 +1418,19 @@ body.popup-open .sheet :is(*, *::before, *::after) {
     }
 }
 
+/* admin: the page tabs, only on phones and tablets (see the admin media query) */
+.admin-tabs {
+    display: none;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding: 0.6rem var(--pad);
+
+    .pill[aria-pressed="true"] {
+        background: var(--foreground);
+        color: var(--background);
+    }
+}
+
 /* admin: one titled block */
 .admin-block {
     display: flex;
@@ -1482,13 +1523,21 @@ body.popup-open .sheet :is(*, *::before, *::after) {
     }
 }
 
-/* admin: everything that changed, newest first, a time on the left */
+/* admin: everything that changed, newest first, a time on the left. it never makes the page
+   taller: it takes the height the player list leaves (at least a few lines) and scrolls inside */
 .history-list {
+    flex: 1 1 auto;
     display: grid;
+    align-content: start;
     gap: 0.6rem;
+    min-height: 12rem;
     margin: 0;
     padding: 0.875rem var(--pad);
     list-style: none;
+    contain: size;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
 
     & li {
         display: grid;
@@ -2251,6 +2300,123 @@ body.cursor-on-link {
 }
 
 /* ------------------------------ */
+/* ADMIN: ONE SCREEN              */
+/* ------------------------------ */
+/* the admin fits the window like the main page and never scrolls; a list that fills up scrolls
+   inside its own box instead, with a thin bar on its right. on short laptop windows there is too
+   little room for that, so the page scrolls as usual there */
+@media (max-width: 980px), (min-height: 760px) {
+    body.admin-page {
+        height: 100dvh;
+        min-height: 0;
+        overflow: hidden;
+
+        .sheet {
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        #admin-view {
+            flex: 1 1 0;
+            min-height: 0;
+        }
+
+        /* the lists share whatever height is left */
+        .admin-grid {
+            flex: 1 1 0;
+            min-height: 0;
+        }
+
+        .admin-grid>*,
+        .admin-side,
+        .history {
+            min-height: 0;
+        }
+
+        /* the lists themselves scroll */
+        :is(#listed-list, #seen-list, .request-cards, .history-list) {
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scrollbar-width: thin;
+            scrollbar-color: var(--foreground) transparent;
+        }
+
+        #listed-list {
+            flex: 1 1 0;
+        }
+
+        /* many requests at once: the cards scroll instead of pushing the lists away */
+        .request-cards {
+            max-height: 35dvh;
+        }
+
+        /* the seen list takes at most half the right column, the history the rest */
+        .admin-side>.admin-block:first-child {
+            flex: 0 1 auto;
+            max-height: 50%;
+        }
+
+        .history-list {
+            flex: 1 1 0;
+            contain: none;
+        }
+    }
+}
+
+/* phones and tablets: one column is too long for one screen, so the admin is split into three
+   pages (players, history, message), picked with the tabs under the menu */
+@media (max-width: 980px) {
+    body.admin-page {
+        .admin-tabs {
+            display: grid;
+        }
+
+        /* only the open page shows */
+        #admin-view:not([data-page="players"]) [data-page="players"],
+        #admin-view:not([data-page="history"]) [data-page="history"],
+        #admin-view:not([data-page="message"]) [data-page="message"],
+        #admin-view[data-page="message"] .admin-grid {
+            display: none;
+        }
+
+        /* one of the two columns shows at a time, filling the page, with no line between them */
+        .admin-grid {
+            grid-template-rows: minmax(0, 1fr);
+
+            &>*+* {
+                border-top: none;
+            }
+        }
+
+        /* the kick message page: the editor, then the preview filling the rest */
+        #admin-view>.row:last-child {
+            flex: 1 1 0;
+            min-height: 0;
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
+
+        .message-row {
+            flex: 1 0 auto;
+        }
+    }
+
+    /* the title is left out here: the menu and the tabs say where you are */
+    .stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.4fr);
+
+        .stat-title {
+            display: none;
+        }
+
+        .stat-title+.stat {
+            border-left: none;
+        }
+    }
+}
+
+/* ------------------------------ */
 /* TABLETS (up to 980px width)    */
 /* ------------------------------ */
 @media (max-width: 980px) {
@@ -2353,31 +2519,75 @@ body.cursor-on-link {
         }
     }
 
+    /* only the switch: the numbers are already on the screen (the players tab counts the waiting,
+       the list head the listed, the history page shows who isn't listed), and the list needs the room */
     .stats {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: minmax(0, 1fr);
 
-        /* the title takes its own line on top, the switch its own line at the bottom */
-        .stat-title {
-            grid-column: 1 / -1;
-            border-bottom: var(--line-width) solid var(--line-color);
+        .stat {
+            display: none;
         }
 
-        .stat-title+.stat {
-            border-left: none;
-        }
-
+        /* the switch on one line, its hint left out */
         .enforce {
-            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            align-items: center;
+            gap: 0 0.75rem;
+            padding-block: 0.5rem;
             border-left: none;
-            border-top: var(--line-width) solid var(--line-color);
+
+            & b {
+                font-size: 1.6rem;
+            }
+
+            #enforce-hint {
+                display: none;
+            }
         }
     }
 
-    .admin-row {
-        grid-template-columns: minmax(0, 1fr);
+    .request-cards:not(:empty) {
+        padding-block: 0.75rem;
+    }
+
+    /* a request: the head next to the name, the two buttons sharing the width under it */
+    .request-card {
+        flex-wrap: wrap;
+        gap: 0.6rem 0.9rem;
+        padding: 0.9rem;
+
+        .head {
+            width: 2.75rem;
+            height: 2.75rem;
+        }
+
+        .request-text {
+            flex-basis: 8rem;
+        }
 
         .actions {
-            justify-content: flex-start;
+            flex: 1 1 100%;
+
+            .pill {
+                flex: 1;
+                height: 2.5rem;
+            }
+        }
+    }
+
+    /* the footer on one line: the refresh time is left out */
+    .admin-page #refreshed {
+        display: none;
+    }
+
+    /* a player stays one line: the button keeps its place on the right, "listed x ago" is left
+       out (the history page has it) */
+    .admin-row {
+        gap: 0.75rem;
+
+        .listed-when {
+            display: none;
         }
     }
 

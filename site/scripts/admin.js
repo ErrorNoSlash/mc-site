@@ -1,10 +1,12 @@
-/*admin page: approve requests, manage the whitelist, turn it on and off*/
+/*admin page: approve requests, manage the whitelist, turn it on and off.
+  on phones and tablets it is split into three pages, picked with the tabs under the menu*/
 const tokenStorageKey = "whitelistAdminToken";
 
-const loginTitle = document.querySelector("#login-title");
-const loginView = document.querySelector("#login-view");
+const loginScreen = document.querySelector("#login-screen");
+const pageTabs = document.querySelectorAll(".admin-tabs [data-show]");
 const loginForm = document.querySelector("#login-form");
 const loginOutput = document.querySelector("#login-output");
+const sheet = document.querySelector(".sheet");
 const adminView = document.querySelector("#admin-view");
 const logoutButton = document.querySelector("#logout");
 const notice = document.querySelector("#notice");
@@ -20,6 +22,7 @@ const confirmYes = document.querySelector("#confirm-yes");
 
 let token = "";
 let overview = null;
+let renderedKey = "";
 let messageDirty = false;
 let noticeTimer = null;
 let answerConfirm = null;
@@ -55,8 +58,7 @@ function adminApi(path, options = {}) {
 
 function showLogin(message) {
     adminView.hidden = true;
-    loginTitle.hidden = false;
-    loginView.hidden = false;
+    loginScreen.hidden = false;
     logoutButton.hidden = true;
     if (message) {
         loginOutput.dataset.tone = "error";
@@ -83,7 +85,7 @@ function askConfirm(title, text, yesLabel) {
     veil.classList.add("is-open");
     veil.setAttribute("aria-hidden", "false");
     document.body.classList.add("popup-open");
-    document.querySelector(".sheet").inert = true;
+    sheet.inert = true;
     confirmYes.focus();
 
     return new Promise(function (resolve) {
@@ -96,7 +98,7 @@ function closeConfirm(answer) {
     veil.classList.remove("is-open");
     veil.setAttribute("aria-hidden", "true");
     document.body.classList.remove("popup-open");
-    document.querySelector(".sheet").inert = false;
+    sheet.inert = false;
 
     answerConfirm(answer);
     answerConfirm = null;
@@ -248,16 +250,24 @@ function deniedActions(entry) {
     );
 }
 
-function historyRow(entry, index, list) {
+/*one line; only the newest line about a request (the list is newest first) gets its buttons*/
+function historyRow(entry, isNewestForRequest) {
     const text = historyText[entry.action] ? historyText[entry.action](entry) : [entry.action];
-    // only the newest line about a request gets its buttons
-    const isNewestForRequest = !list.slice(0, index).some(function (other) { return other.requestId && other.requestId === entry.requestId; });
     const time = new Date(entry.at);
     return h("li", null,
         h("time", { datetime: entry.at, title: time.toLocaleString() }, time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })),
         h("span", null, ...text),
         entry.action === "denied" && isNewestForRequest ? deniedActions(entry) : null
     );
+}
+
+function historyRows(activity) {
+    const requestsShown = new Set();
+    return activity.map(function (entry) {
+        const isNewest = Boolean(entry.requestId) && !requestsShown.has(entry.requestId);
+        if (entry.requestId) requestsShown.add(entry.requestId);
+        return historyRow(entry, isNewest);
+    });
 }
 
 /* kick message preview: the MiniMessage tags the plugin understands, drawn like the game draws them */
@@ -302,10 +312,11 @@ function renderMessagePreview() {
         last = match.index + match[0].length;
         const [, closing, tag] = match;
         const name = tag.toLowerCase();
+        const style = tagStyle(name);
         if (name === "newline" || name === "br") parts.push(h("br"));
         else if (name === "reset") styles = [];
         else if (closing) styles = styles.filter(function (open) { return open.tag !== name; });
-        else if (tagStyle(name)) styles.push({ tag: name, css: tagStyle(name) });
+        else if (style) styles.push({ tag: name, css: style });
         else addText(match[0]);
     }
     addText(text.slice(last));
@@ -320,13 +331,20 @@ function fill(id, rows, emptyText) {
 
 /* render */
 
+/*draws everything from the overview. the 20 s refresh only redraws when something changed, or once a
+  minute for the "x min ago" texts, so a focused button isn't swapped out under you for nothing*/
 function render(data) {
+    document.querySelector("#refreshed").textContent = "refreshed " + new Date().toLocaleTimeString();
+    const key = JSON.stringify(data) + Math.floor(Date.now() / 60000);
+    if (key === renderedKey) return;
+    renderedKey = key;
     overview = data;
     const pending = data.requests.filter(function (request) { return request.status === "pending"; });
     const unlisted = data.seen.filter(function (entry) { return !entry.listed; });
-    const players = [...data.whitelist.players].sort(function (a, b) { return a.name.localeCompare(b.name); });
+    const players = [...data.whitelist.players].sort(function (a, b) { return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }); });
 
     document.querySelector("#stat-pending").textContent = pending.length;
+    document.querySelector("#tab-waiting").textContent = pending.length ? " · " + pending.length : "";
     document.querySelector("#stat-listed").textContent = players.length;
     document.querySelector("#stat-unlisted").textContent = unlisted.length;
     document.querySelector("#title-meta").textContent = "[ " + pending.length + " waiting ]";
@@ -345,21 +363,19 @@ function render(data) {
     fill("listed-list", players.map(listedRow), "nobody yet. add yourself first!");
     fill("seen-list", unlisted.map(seenRow), data.seen.length ? "everyone who joined is listed." : "nobody has joined since the plugin was installed.");
     document.querySelector("#add-all-seen").hidden = unlisted.length < 2;
-    fill("history-list", (data.activity || []).map(historyRow), "nothing has changed yet.");
+    fill("history-list", historyRows(data.activity || []), "nothing has changed yet.");
 
     if (!messageDirty && document.activeElement !== messageBox) {
         messageBox.value = data.whitelist.message || data.whitelist.defaultMessage;
         renderMessagePreview();
     }
-    document.querySelector("#refreshed").textContent = "refreshed " + new Date().toLocaleTimeString();
 }
 
 async function load() {
     if (!token) return showLogin();
     try {
         render(await adminApi("/api/admin/overview"));
-        loginTitle.hidden = true;
-        loginView.hidden = true;
+        loginScreen.hidden = true;
         adminView.hidden = false;
         logoutButton.hidden = false;
     } catch (error) {
@@ -392,6 +408,7 @@ logoutButton.addEventListener("click", function () {
     forgetToken();
     token = "";
     overview = null;
+    renderedKey = "";
     showLogin();
 });
 
@@ -453,6 +470,16 @@ document.querySelector("#message-reset").addEventListener("click", function () {
     messageDirty = false;
     renderMessagePreview();
     act(adminApi("/api/admin/settings", { method: "PUT", body: { message: "" } }), "back to the default message");
+});
+
+/* phones and tablets: the tabs under the menu switch between the three pages */
+pageTabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+        adminView.dataset.page = tab.dataset.show;
+        pageTabs.forEach(function (other) {
+            other.setAttribute("aria-pressed", String(other === tab));
+        });
+    });
 });
 
 /* the popup's buttons, or a click on the dark veil around it */

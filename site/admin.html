@@ -24,10 +24,11 @@
     <script src="scripts/config.js" defer></script>
     <script src="scripts/common.js" defer></script>
     <script src="scripts/cursor.js" defer></script>
+    <script src="scripts/panorama.js" defer></script>
     <script src="scripts/admin.js" defer></script>
 </head>
 
-<body>
+<body class="admin-page">
     <!-- the cursor: a crosshair + a block outline (cursor.js, mouse only) -->
     <div class="cursor-dot" data-cursor-dot></div>
     <div class="cursor-outline" data-cursor-outline></div>
@@ -45,37 +46,57 @@
 
         <div class="notice" id="notice" role="status" hidden></div>
 
-        <!-- the big title, only on the login screen: once logged in it shrinks into the numbers row -->
-        <div class="row title compact" id="login-title" data-state="online">
-            <div class="title-label">
-                <span><span class="title-star">*</span> DS NETWORK</span>
-                <span class="title-meta" id="title-meta">[ whitelist ]</span>
+        <!-- the login screen, like the game's title screen: the big title and a login window over the
+             turning world (panorama.js). once logged in it goes away and the title shrinks into the numbers row -->
+        <div class="hero login-screen" id="login-screen">
+            <div class="panorama" aria-hidden="true"></div>
+
+            <div class="row title compact" data-state="online">
+                <div class="title-label">
+                    <span><span class="title-star">*</span> DS NETWORK</span>
+                    <span class="title-meta" id="title-meta">[ whitelist ]</span>
+                </div>
+                <div class="echo echo-far" aria-hidden="true">ADMIN</div>
+                <div class="echo echo-near" aria-hidden="true">ADMIN</div>
+                <h1>ADMIN</h1>
+                <p class="splash" data-fixed aria-hidden="true">op only!</p>
             </div>
-            <div class="echo echo-far" aria-hidden="true">ADMIN</div>
-            <div class="echo echo-near" aria-hidden="true">ADMIN</div>
-            <h1>ADMIN</h1>
-            <p class="splash" data-fixed aria-hidden="true">op only!</p>
+
+            <!-- the login window, drawn like the popups on the main page -->
+            <section class="row login-view">
+                <form class="panel login" id="login-form" aria-labelledby="login-heading">
+                    <div class="panel-head">
+                        <h2 id="login-heading">Admin login</h2>
+                    </div>
+                    <div class="panel-body">
+                        <p class="login-text">Paste your admin token (<b>WHITELIST_ADMIN_TOKEN</b> in secrets.yaml).</p>
+                        <label class="field">
+                            <span class="caption">admin token</span>
+                            <input type="password" name="token" autocomplete="current-password" required>
+                        </label>
+                        <label class="check"><input type="checkbox" name="remember"> remember on this device</label>
+                        <output class="terminal-output" id="login-output" aria-live="polite"></output>
+                    </div>
+                    <div class="panel-buttons">
+                        <a class="mc-button" href="index.html">Back to site</a>
+                        <button class="mc-button" type="submit">Log in</button>
+                    </div>
+                </form>
+            </section>
         </div>
 
-        <!-- shown until the token is accepted -->
-        <section class="row grow" id="login-view">
-            <form class="login" id="login-form">
-                <p>Paste your admin token (<b>WHITELIST_ADMIN_TOKEN</b> in secrets.yaml).</p>
-                <label class="field">
-                    <span class="caption">admin token</span>
-                    <input type="password" name="token" autocomplete="current-password" required>
-                </label>
-                <label class="check"><input type="checkbox" name="remember"> remember on this device</label>
-                <button class="submit" type="submit"><span>log in</span><span class="link-go">GO &gt;</span></button>
-                <output class="terminal-output" id="login-output" aria-live="polite"></output>
-            </form>
-        </section>
-
         <!-- everything below needs the token -->
-        <div id="admin-view" hidden>
+        <div id="admin-view" data-page="players" hidden>
+
+            <!-- phones and tablets: the admin is split into three pages, picked here (admin.js) -->
+            <nav class="row admin-tabs" aria-label="Pages">
+                <button class="pill" type="button" data-show="players" aria-pressed="true">players<span id="tab-waiting"></span></button>
+                <button class="pill" type="button" data-show="history" aria-pressed="false">history</button>
+                <button class="pill" type="button" data-show="message" aria-pressed="false">message</button>
+            </nav>
 
             <!-- the title, the numbers and the switch in one row -->
-            <div class="row stats">
+            <div class="row stats" data-page="players">
                 <div class="cell stat stat-title">
                     <span class="caption">* ds network</span>
                     <span class="stat-word"><b>ADMIN</b><span class="sticker">op only!</span></span>
@@ -90,7 +111,7 @@
                 </button>
             </div>
 
-            <section class="row admin-block" aria-labelledby="pending-head">
+            <section class="row admin-block" aria-labelledby="pending-head" data-page="players">
                 <!-- one line when nothing is waiting, a big card per request when something is -->
                 <div class="block-head">
                     <span id="pending-head">dias@mc:~$ /whitelist requests</span>
@@ -104,7 +125,7 @@
             </section>
 
             <div class="row admin-grid grow">
-                <section class="admin-block" aria-labelledby="listed-head">
+                <section class="admin-block" aria-labelledby="listed-head" data-page="players">
                     <div class="block-head"><span id="listed-head">dias@mc:~$ /whitelist list</span><span class="caption" id="listed-count"></span></div>
                     <form class="add-form" id="add-form">
                         <select name="edition" aria-label="Edition">
@@ -118,7 +139,7 @@
                 </section>
 
                 <!-- the right column: who joined without being listed, then everything that changed -->
-                <div class="admin-side">
+                <div class="admin-side" data-page="history">
                     <section class="admin-block" aria-labelledby="seen-head">
                         <div class="block-head">
                             <span id="seen-head">dias@mc:~$ /seen --not-listed</span>
@@ -135,7 +156,7 @@
             </div>
 
             <!-- the kick message: the editor on the left, what a turned-away player sees on the right -->
-            <section class="row admin-block" aria-labelledby="message-head">
+            <section class="row admin-block" aria-labelledby="message-head" data-page="message">
                 <div class="block-head"><span id="message-head">dias@mc:~$ /kick-message</span></div>
                 <div class="message-row">
                     <form class="message-editor" id="message-form">
