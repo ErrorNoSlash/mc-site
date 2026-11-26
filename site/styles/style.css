@@ -2177,11 +2177,6 @@ body.popup-open .sheet :is(*, *::before, *::after) {
     .lead-cta:hover .arrow {
         transform: translateY(0.25rem);
     }
-
-    /* the marquee holds still while you read it */
-    .marquee:hover span {
-        animation-play-state: paused;
-    }
 }
 
 /* on a phone: the same effects on a tap */
