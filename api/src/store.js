@@ -326,32 +326,45 @@ export function readSeen() {
         }));
 }
 
-/* the archived worlds, as mc-backup --archive wrote them to archived.txt:
-   name <tab> when it was archived <tab> the archive's size in bytes */
-let archivedRead = { mtimeMs: -1, worlds: [] };
+/* a small list the host scripts write (archived.txt, off.txt): one server per line,
+   name <tab> a date <tab> one more field. read again only when the file changes; bad lines are skipped */
+const listCache = new Map();
 
-export function readArchived() {
+function readServerList(file, toEntry) {
     let mtimeMs;
     try {
-        mtimeMs = fs.statSync(config.archivedFile).mtimeMs;
+        mtimeMs = fs.statSync(file).mtimeMs;
     } catch {
         return [];
     }
-    if (mtimeMs === archivedRead.mtimeMs) return archivedRead.worlds;
-    const text = readSmallFile(config.archivedFile, ARCHIVED_MAX_BYTES) || "";
-    const worlds = text.split("\n")
+    const cached = listCache.get(file);
+    if (cached && cached.mtimeMs === mtimeMs) return cached.entries;
+    const text = readSmallFile(file, ARCHIVED_MAX_BYTES) || "";
+    const entries = text.split("\n")
         .filter((line) => line && !line.startsWith("#"))
-        .map((line) => {
-            const [name, archivedAt, size] = line.split("\t");
-            return { name, archivedAt: Date.parse(archivedAt), size: Number(size) };
-        })
-        .filter((world) => /^[\w.-]{1,40}$/.test(world.name || "") && validTime(world.archivedAt))
+        .map((line) => line.split("\t"))
+        .filter(([name, date]) => /^[\w.-]{1,40}$/.test(name || "") && validTime(Date.parse(date)))
         .slice(0, 100)
-        .map((world) => ({
-            name: world.name,
-            archivedAt: new Date(world.archivedAt).toISOString(),
-            size: Number.isFinite(world.size) && world.size >= 0 ? world.size : null,
-        }));
-    archivedRead = { mtimeMs, worlds };
-    return worlds;
+        .map(([name, date, extra]) => toEntry(name, new Date(Date.parse(date)).toISOString(), extra));
+    listCache.set(file, { mtimeMs, entries });
+    return entries;
+}
+
+/* the archived worlds, as mc-backup --archive wrote them: name, when, the archive's size in bytes */
+export function readArchived() {
+    return readServerList(config.archivedFile, (name, archivedAt, size) => ({
+        name,
+        archivedAt,
+        size: Number.isFinite(Number(size)) && Number(size) >= 0 && size !== "" ? Number(size) : null,
+    }));
+}
+
+/* servers turned off on purpose, as mc-off wrote them: name, since when, and the reason (shown on
+   the website as text; control characters dropped, 80 characters at most) */
+export function readOff() {
+    return readServerList(config.offFile, (name, since, reason) => ({
+        name,
+        since,
+        reason: String(reason || "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 80),
+    }));
 }

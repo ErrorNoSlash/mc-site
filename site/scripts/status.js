@@ -51,13 +51,18 @@ function serverRow(server, index, isNetwork) {
         else if (server.version) details.push(server.version);
         if (!isNetwork && server.players && server.players.names.length) details.push(server.players.names.join(", "));
         else if (!isNetwork && server.players && server.players.online === 0) details.push("nobody on right now");
+    } else if (server.off) {
+        details.push(offText(server.off));
     } else {
         details.push(isNetwork ? "the proxy isn't answering" : "not answering pings");
     }
 
+    // turned off on purpose (OFF) reads differently from down (DOWN, struck through)
+    const state = server.online ? "" : server.off ? " is-off" : " is-offline";
+
     // the row opens its server popup (popups.js)
     return h("div", {
-        class: "server-row" + (server.online ? "" : " is-offline") + (isNetwork ? " is-network" : ""),
+        class: "server-row" + state + (isNetwork ? " is-network" : ""),
         role: "button", tabindex: "0", "aria-label": "About " + server.name,
         "data-server": isNetwork ? "network" : String(index - 1)
     },
@@ -68,7 +73,7 @@ function serverRow(server, index, isNetwork) {
             isNetwork && server.online && server.players ? xpBar(server) : null
         ),
         h("span", { class: "server-state" },
-            server.online ? playersText(server) : "DOWN",
+            server.online ? playersText(server) : server.off ? "OFF" : "DOWN",
             pingBars(server.online, server.latencyMs)
         )
     );

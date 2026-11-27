@@ -24,6 +24,7 @@ set -l source_dir (set -q MC_DATA; and echo $MC_DATA; or echo /data/minecraft)
 set -l default_dest $HOME/backups/minecraft
 # the list of archived worlds (read-only for the proxy and the API) and the stack's own settings
 set -l archived_list $source_dir/archived/archived.txt
+set -l off_list $source_dir/archived/off.txt
 set -l stack_env (set -q MC_STACK; and echo $MC_STACK; or echo $HOME/Docker/stacks/minecraft)/.env
 
 # things the servers download again by themselves; leaving them out keeps the backups small
@@ -201,6 +202,8 @@ if set -q _flag_archive
         exit 1
     end
     set_line $stack_env (env_name $name) = 0
+    # an archived world isn't "turned off" any more (mc-off): it is listed apart
+    test -f $off_list; and set_line $off_list $name \t ""
     say "archived: the proxy takes $name off its server list within a few seconds, the website lists it as archived,"
     say "and mc-up leaves its server off (from $stack_env). nothing else to do."
     exit 0

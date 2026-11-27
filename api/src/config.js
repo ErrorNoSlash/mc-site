@@ -47,6 +47,8 @@ export const config = {
     seenFile: env.SEEN_FILE || path.join(env.PLUGIN_DIR || "/plugin", "seen.tsv"),
     // the archived worlds, written by mc-backup --archive on the server; read-only here
     archivedFile: env.ARCHIVED_FILE || "/archived/archived.txt",
+    // servers turned off on purpose (mc-off), next to it; read-only too
+    offFile: env.OFF_FILE || path.join(path.dirname(env.ARCHIVED_FILE || "/archived/archived.txt"), "off.txt"),
 
     servers: parseServers(env.STATUS_SERVERS || "DS Network=velocity:25565"),
     statusCacheSeconds: Number(env.STATUS_CACHE_SECONDS) || 15,

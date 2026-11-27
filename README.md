@@ -171,6 +171,7 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | `EXPORT_DIR`                | `PLUGIN_DIR`                | where `whitelist.txt` for the plugin goes        |
 | `SEEN_FILE`                 | `PLUGIN_DIR/seen.tsv`       | who joined, written by the plugin (read-only)    |
 | `ARCHIVED_FILE`             | `/archived/archived.txt`    | the archived worlds, written by `mc-backup` (read-only) |
+| `OFF_FILE`                  | `off.txt` next to it        | servers turned off on purpose, written by `mc-off` (read-only) |
 | `STATUS_SERVERS`            | `DS Network=velocity:25565` | `name=host:port, …`; the first is the proxy      |
 | `STATUS_CACHE_SECONDS`      | `15`                        | how often the servers are pinged at most         |
 | `STATUS_SHOW_PLAYERS`       | `true`                      | show online player names                         |
@@ -182,6 +183,8 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | `NTFY_PRIORITY`             | `3`                         | 1 to 5; compose sets `4` so requests buzz        |
 
 Data lives in `/data/minecraft/whitelist/` (`requests.json`, `whitelist.json`, `logins.json`, and `export/whitelist.txt` for the plugin). `mc-backup` ([`server/backup.fish`](server/backup.fish)) backs it up with the worlds: `mc-backup` for everything, `mc-backup survival anarchy` for some, `--list`, `--keep N`, `--to DIR`, `--restore NAME`. A world you no longer play: `mc-backup --archive NAME` packs it away for good (kept in `<backups>/archive`, never thinned out), stops its server and can free its space; `--unarchive NAME` brings it back, then `mc-up`. Nothing else changes: the script lists the world in `/data/minecraft/archived/archived.txt` (the proxy drops it from its server list within seconds, the status and the site show it under archived worlds with its date and size) and sets `MC_<NAME>=0` in the stack's `.env`, so `mc-up` leaves it off. A new world needs `deploy: replicas: ${MC_<NAME>:-1}` in its service, like the others.
+
+A server you only want off for a while: `mc-off anarchy back in december` ([`server/power.fish`](server/power.fish)) stops it, keeps `mc-up` from starting it, and the site shows it as **OFF** with that reason and the date, instead of **DOWN** (which stays for a server that should be up but isn't answering). `mc-on anarchy`, then `mc-up`, turns it back on; `mc-off` alone lists what is off. Nothing happens to the world.
 
 </details>
 

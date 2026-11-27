@@ -1,9 +1,10 @@
 // Minecraft "server list ping": the same request the multiplayer screen sends.
-// Pings every server in STATUS_SERVERS straight over the Docker network, except archived worlds.
+// Pings every server in STATUS_SERVERS straight over the Docker network, except archived worlds;
+// one that is down because it was turned off on purpose (mc-off) is marked as off.
 
 import net from "node:net";
 import { config } from "./config.js";
-import { readArchived } from "./store.js";
+import { readArchived, readOff } from "./store.js";
 
 function writeVarInt(value) {
     const bytes = [];
@@ -131,7 +132,14 @@ export async function getStatus() {
         const archivedNames = new Set(archived.map((world) => world.name.toLowerCase()));
         const live = config.servers.filter((server, index) => index === 0 || !archivedNames.has(server.name.toLowerCase()));
         const results = await Promise.all(live.map((server) => ping(server.host, server.port)));
-        const summaries = live.map((server, index) => summarise(server, results[index]));
+        // a server that isn't answering but was turned off on purpose (mc-off) says so, instead of "down"
+        const off = new Map(readOff().map((entry) => [entry.name.toLowerCase(), entry]));
+        const summaries = live.map((server, index) => {
+            const summary = summarise(server, results[index]);
+            const turnedOff = off.get(server.name.toLowerCase());
+            if (index > 0 && !summary.online && turnedOff) summary.off = { since: turnedOff.since, reason: turnedOff.reason };
+            return summary;
+        });
         const [network, ...servers] = summaries;
         cached = { updatedAt: new Date().toISOString(), network, servers, archived };
         cachedAt = Date.now();

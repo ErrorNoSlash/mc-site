@@ -705,6 +705,17 @@ textarea {
         }
     }
 
+    /* turned off on purpose: dimmed, but not struck through like a server that is down */
+    &.is-off {
+        .server-name {
+            opacity: 0.55;
+        }
+
+        .ping-bars {
+            opacity: 0.35;
+        }
+    }
+
     &.is-loading {
         opacity: 0.6;
     }
@@ -1372,7 +1383,8 @@ body.popup-open .sheet :is(*, *::before, *::after) {
         outline: none;
     }
 
-    &.is-offline :is(b, .mc-icon) {
+    /* a server that is down or turned off: its name and icon dimmed */
+    &:is(.is-offline, .is-off) :is(b, .mc-icon) {
         opacity: 0.45;
     }
 

@@ -132,6 +132,13 @@ function pixelSvg(width, height, rects, label) {
     return svg;
 }
 
+/*a server turned off on purpose (mc-off on the server): "turned off: the reason · since 27 Nov".
+  everything else that isn't answering is down*/
+function offText(off) {
+    const since = new Date(off.since).toLocaleDateString([], { day: "numeric", month: "short" });
+    return "turned off" + (off.reason ? ": " + off.reason : "") + " · since " + since;
+}
+
 /*the five connection bars from the multiplayer screen*/
 function pingBars(online, latencyMs) {
     let level = 0;

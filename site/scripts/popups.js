@@ -29,13 +29,13 @@ function chestIcon() {
 }
 
 function serverEntry(server, isNetwork, index) {
-    const detail = !server.online ? "Can't connect to server"
+    const detail = !server.online ? (server.off ? offText(server.off) : "Can't connect to server")
         : isNetwork ? site.javaAddress + (server.motd ? " · " + server.motd : "")
             : (server.version || "") + (server.players && server.players.names.length ? " · " + server.players.names.join(", ") : "");
 
     return h("button", isNetwork
         ? { class: "mc-entry is-network", type: "button", "data-copy": site.javaAddress, title: "Copy the address" }
-        : { class: "mc-entry" + (server.online ? "" : " is-offline"), type: "button", "data-server": String(index), title: "About " + server.name },
+        : { class: "mc-entry" + (server.online ? "" : server.off ? " is-off" : " is-offline"), type: "button", "data-server": String(index), title: "About " + server.name },
         serverIcon(isNetwork),
         h("span", { class: "mc-entry-text" },
             h("b", null, server.name),
@@ -146,7 +146,9 @@ function fillServerPanel(key) {
     const body = [];
     if (about) body.push(h("p", { class: "info-about" }, about));
     body.push(infoCard(picture, [
-        ["status", server.online ? "online" : "down"],
+        ["status", server.online ? "online" : server.off ? "turned off" : "down"],
+        !server.online && server.off && server.off.reason ? ["why", server.off.reason] : null,
+        !server.online && server.off ? ["since", new Date(server.off.since).toLocaleDateString([], { day: "numeric", month: "long", year: "numeric" })] : null,
         isNetwork ? ["address", h("button", { class: "copy-text", type: "button", "data-copy": site.javaAddress, title: "Copy" }, site.javaAddress)] : null,
         server.online && server.version && !isNetwork ? ["version", server.version] : null,
         server.online && server.players ? ["players", playersText(server)] : null,
