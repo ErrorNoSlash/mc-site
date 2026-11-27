@@ -197,6 +197,10 @@ services:
     networks:
       - mc-network
 
+  # archiving a world you no longer play: mc-backup --archive NAME packs it away and stops it, then here
+  # give its service  profiles: ["archived"]  (so mc-up leaves it off), and take it out of [servers] in
+  # velocity.toml above and out of STATUS_SERVERS below. mc-backup --unarchive NAME and undoing those
+  # three brings it back.
   mc-anarchy:
     container_name: "MC-anarchy"
     image: itzg/minecraft-server:2026.11.1

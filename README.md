@@ -164,7 +164,7 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | `NTFY_TOPIC` / `NTFY_TOKEN` |                             | the topic and access token                       |
 | `NTFY_PRIORITY`             | `3`                         | 1 to 5; compose sets `4` so requests buzz        |
 
-Data lives in `/data/minecraft/whitelist/` (`requests.json`, `whitelist.json`). `mc-backup` ([`server/backup.fish`](server/backup.fish)) backs it up with the worlds: `mc-backup` for everything, `mc-backup survival anarchy` for some, `--list`, `--keep N`, `--to DIR`, `--restore NAME`.
+Data lives in `/data/minecraft/whitelist/` (`requests.json`, `whitelist.json`). `mc-backup` ([`server/backup.fish`](server/backup.fish)) backs it up with the worlds: `mc-backup` for everything, `mc-backup survival anarchy` for some, `--list`, `--keep N`, `--to DIR`, `--restore NAME`. A world you no longer play: `mc-backup --archive NAME` packs it away for good (kept in `<backups>/archive`, never thinned out), stops its server and can free its space; `--unarchive NAME` brings it back. The script prints the three compose-file lines to change.
 
 </details>
 
