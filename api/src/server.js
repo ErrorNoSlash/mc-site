@@ -331,6 +331,9 @@ route("POST", /^\/api\/requests$/, async (req, res) => {
 
     // typos are fine (20 tries an hour), but at most 3 new requests an hour from one address
     rateLimit("request-try", ip, 20, 60 * 60);
+    // who is asking: required, so a request is never just a name
+    const note = cleanNote(body.note);
+    if (note.length < 5) throw new HttpError(400, "Say who you are: who invited you, or your Discord name.");
     const player = await resolvePlayer(body.edition, body.name);
 
     if (store.findBlocked(player.edition, player.name, player.uuid)) {
@@ -351,7 +354,7 @@ route("POST", /^\/api\/requests$/, async (req, res) => {
     }
     rateLimit("request-new", ip, 3, 60 * 60);
 
-    const request = store.addRequest({ ...player, note: cleanNote(body.note), ipHash: hashIp(ip) });
+    const request = store.addRequest({ ...player, note, ipHash: hashIp(ip) });
     log(`new request ${request.id}: ${request.name} (${request.edition})`);
     notifyNewRequest(request, store.pendingCount()).catch((error) => log("ntfy:", error.message));
 
@@ -443,6 +446,8 @@ route("GET", /^\/api\/admin\/overview$/, (req, res, url) => {
     return {
         requests: [...store.allRequests()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 500),
         whitelist: { ...whitelist, defaultMessage: store.DEFAULT_MESSAGE, blockedMessage: store.BLOCKED_MESSAGE },
+        // what {site} in the kick message becomes, for the preview
+        siteHost: config.siteUrl.replace(/^https?:\/\//, ""),
         seen,
         activity: store.getActivity().slice(-100).reverse(),
         ntfy: ntfyEnabled(),

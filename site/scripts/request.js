@@ -90,6 +90,12 @@ form.addEventListener("submit", async function (e) {
         nameInput.focus();
         return;
     }
+    // a request has to say who is asking (the API checks this too)
+    if (!checking && form.elements.note.value.trim().length < 5) {
+        say(["say who you are: who invited you, or your discord name."], "error");
+        form.elements.note.focus();
+        return;
+    }
 
     submitButton.disabled = true;
     say([checking ? "looking it up..." : "sending..."], "wait");

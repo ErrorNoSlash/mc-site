@@ -148,10 +148,12 @@
                         </span>
                     </div>
                     <form class="add-form" id="add-form">
-                        <select name="edition" aria-label="Edition">
-                            <option value="java">java</option>
-                            <option value="bedrock">bedrock</option>
-                        </select>
+                        <!-- java or bedrock: two pills instead of a dropdown, whose list the browser draws its own way -->
+                        <span class="edition-switch" role="group" aria-label="Edition">
+                            <button class="pill" type="button" data-edition="java" aria-pressed="true">java</button>
+                            <button class="pill" type="button" data-edition="bedrock" aria-pressed="false">bedrock</button>
+                        </span>
+                        <input type="hidden" name="edition" value="java">
                         <input type="text" name="name" placeholder="name or gamertag" aria-label="Name or gamertag" autocomplete="off" spellcheck="false" required>
                         <input type="text" name="reason" placeholder="why (only you see this)" aria-label="Why, only you see this" autocomplete="off" maxlength="100" hidden>
                         <button class="pill is-main" type="submit" id="add-button">add</button>

@@ -164,9 +164,10 @@
                     </label>
                     <p class="hint" id="name-hint">exactly as it shows in the game</p>
 
+                    <!-- required for a request (request.js and the API check it): who is asking -->
                     <label class="field" id="note-field">
-                        <span class="caption">anything else? (optional)</span>
-                        <textarea name="note" maxlength="300" rows="2" placeholder="who invited you, your discord name..."></textarea>
+                        <span class="caption">who are you?</span>
+                        <textarea name="note" minlength="5" maxlength="300" rows="2" placeholder="who invited you, your discord name..."></textarea>
                     </label>
 
                     <!-- left empty by people, filled in by bots -->

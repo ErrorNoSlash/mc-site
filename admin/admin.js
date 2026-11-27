@@ -496,7 +496,7 @@ function tagStyle(tag) {
 function renderMessagePreview() {
     const text = messageBox.value
         .replaceAll("{name}", "Steve")
-        .replaceAll("{site}", location.host || "join.errornoslash.be");
+        .replaceAll("{site}", (overview && overview.siteHost) || "join.errornoslash.be");
     const parts = [];
     let styles = [];
     let last = 0;
@@ -694,6 +694,14 @@ addForm.addEventListener("submit", async function (e) {
         addForm.elements.name.value = "";
         addForm.elements.reason.value = "";
     }
+});
+
+/* java / bedrock: the pills in the form set the hidden edition field */
+document.querySelectorAll(".edition-switch [data-edition]").forEach(function (pill, index, all) {
+    pill.addEventListener("click", function () {
+        addForm.elements.edition.value = pill.dataset.edition;
+        all.forEach(function (other) { other.setAttribute("aria-pressed", String(other === pill)); });
+    });
 });
 
 /* whitelist / blacklist: the tabs in the list's header line */

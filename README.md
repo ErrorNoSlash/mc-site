@@ -141,7 +141,7 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | method   | path                                        | who              |
 | -------- | ------------------------------------------- | ---------------- |
 | `GET`    | `/api/status`                               | anyone           |
-| `POST`   | `/api/requests` `{edition, name, note}`     | anyone           |
+| `POST`   | `/api/requests` `{edition, name, note}` (note required: who is asking) | anyone |
 | `GET`    | `/api/requests/lookup?edition=&name=`       | anyone           |
 | `POST`   | `/api/act/:id/approve\|deny?exp=&sig=`      | signed ntfy link |
 | `GET`    | `/admin/`                                   | the admin page, home network / Tailscale only (404 elsewhere) |
