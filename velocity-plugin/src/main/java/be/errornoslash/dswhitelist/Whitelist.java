@@ -16,6 +16,8 @@ import java.util.UUID;
  *   bedrock   <uuid or ->   <.floodgate name>
  *
  * Unknown keys are ignored so newer API versions can add lines without breaking this.
+ * The file comes from the website's API, so it is not trusted blindly: a line that doesn't
+ * parse is skipped (not the whole file), and the message and the number of players are capped.
  */
 final class Whitelist {
 
@@ -23,6 +25,10 @@ final class Whitelist {
             "<red>You are not whitelisted on this server.</red>";
 
     static final Whitelist MISSING = new Whitelist(false, DEFAULT_MESSAGE, Set.of(), Set.of(), 0);
+
+    // more than any real whitelist; anything past this is ignored
+    static final int MAX_PLAYERS = 10_000;
+    static final int MAX_MESSAGE_LENGTH = 2_000;
 
     private final boolean enforced;
     private final String message;
@@ -51,32 +57,36 @@ final class Whitelist {
                 continue;
             }
             String[] parts = raw.split("\t", -1);
-            switch (parts[0].strip()) {
-                case "enabled" -> enforced = parts.length > 1 && parts[1].strip().equalsIgnoreCase("true");
-                case "message" -> {
-                    if (parts.length > 1 && !parts[1].isBlank()) {
-                        message = parts[1];
-                    }
-                }
-                case "java" -> {
-                    if (parts.length > 1) {
-                        uuids.add(UUID.fromString(parts[1].strip()));
-                        size++;
-                    }
-                }
-                case "bedrock" -> {
-                    if (parts.length > 2) {
-                        String uuid = parts[1].strip();
-                        if (!uuid.isEmpty() && !uuid.equals("-")) {
-                            uuids.add(UUID.fromString(uuid));
+            try {
+                switch (parts[0].strip()) {
+                    case "enabled" -> enforced = parts.length > 1 && parts[1].strip().equalsIgnoreCase("true");
+                    case "message" -> {
+                        if (parts.length > 1 && !parts[1].isBlank() && parts[1].length() <= MAX_MESSAGE_LENGTH) {
+                            message = parts[1];
                         }
-                        bedrockNames.add(parts[2].strip().toLowerCase(Locale.ROOT));
-                        size++;
+                    }
+                    case "java" -> {
+                        if (parts.length > 1 && size < MAX_PLAYERS) {
+                            uuids.add(UUID.fromString(parts[1].strip()));
+                            size++;
+                        }
+                    }
+                    case "bedrock" -> {
+                        if (parts.length > 2 && size < MAX_PLAYERS) {
+                            String uuid = parts[1].strip();
+                            if (!uuid.isEmpty() && !uuid.equals("-")) {
+                                uuids.add(UUID.fromString(uuid));
+                            }
+                            bedrockNames.add(parts[2].strip().toLowerCase(Locale.ROOT));
+                            size++;
+                        }
+                    }
+                    default -> {
+                        // a newer line type: ignore
                     }
                 }
-                default -> {
-                    // a newer line type: ignore
-                }
+            } catch (IllegalArgumentException badLine) {
+                // not a uuid: skip this line, keep the rest
             }
         }
         return new Whitelist(enforced, message, Set.copyOf(uuids), Set.copyOf(bedrockNames), size);

@@ -10,12 +10,22 @@ import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
+import com.velocitypowered.api.proxy.server.ServerInfo;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
+import net.kyori.adventure.text.minimessage.tag.standard.StandardTags;
 import org.slf4j.Logger;
 
 /*
@@ -30,6 +40,13 @@ import org.slf4j.Logger;
  * Bedrock players are matched by their Floodgate name (".Gamertag"), because their UUID
  * comes from an Xbox id the website cannot look up reliably. Java names cannot contain a
  * dot, so a Java account can never pass as a Bedrock name.
+ *
+ * Worlds listed in archived.txt (written by mc-backup --archive on the server) are taken
+ * off the proxy's server list while they are archived, and put back when they are not.
+ *
+ * Both files are read-only here and treated as untrusted: they are size-capped, a bad line
+ * is skipped, and the kick message may only use colours and text styles (no click, hover,
+ * insertion or other interactive tags).
  */
 @Plugin(
         id = "ds-whitelist",
@@ -39,25 +56,51 @@ import org.slf4j.Logger;
         authors = {"Dias Stas"})
 public final class DsWhitelistPlugin {
 
-    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+    // the kick message may only colour and style text
+    private static final MiniMessage MINI_MESSAGE = MiniMessage.builder()
+            .tags(TagResolver.builder()
+                    .resolver(StandardTags.color())
+                    .resolver(StandardTags.decorations())
+                    .resolver(StandardTags.gradient())
+                    .resolver(StandardTags.rainbow())
+                    .resolver(StandardTags.reset())
+                    .resolver(StandardTags.newline())
+                    .build())
+            .build();
+
+    // bigger files than these are not something the API or mc-backup wrote: they are not read
+    private static final long MAX_WHITELIST_BYTES = 2L * 1024 * 1024;
+    private static final long MAX_ARCHIVED_BYTES = 64L * 1024;
 
     private final ProxyServer proxy;
     private final Logger logger;
     private final Path dataDirectory;
     private final Path whitelistFile;
+    private final Path archivedFile;
     private final SeenLog seenLog;
 
     private volatile Whitelist whitelist = Whitelist.MISSING;
     private long loadedModified = Long.MIN_VALUE;
     private boolean warnedMissing;
 
+    // archived worlds taken off the server list, kept so they can be put back
+    private final Map<String, ServerInfo> hiddenServers = new HashMap<>();
+    private long archivedModified = Long.MIN_VALUE;
+
     @Inject
     public DsWhitelistPlugin(ProxyServer proxy, Logger logger, @DataDirectory Path dataDirectory) {
         this.proxy = proxy;
         this.logger = logger;
         this.dataDirectory = dataDirectory;
-        this.whitelistFile = dataDirectory.resolve("whitelist.txt");
+        // where the files are can be set from the container (they are mounted read-only from elsewhere)
+        this.whitelistFile = pathFromEnvironment("DS_WHITELIST_FILE", dataDirectory.resolve("whitelist.txt"));
+        this.archivedFile = pathFromEnvironment("DS_ARCHIVED_FILE", dataDirectory.resolve("archived.txt"));
         this.seenLog = new SeenLog(dataDirectory.resolve("seen.tsv"));
+    }
+
+    private static Path pathFromEnvironment(String name, Path fallback) {
+        String value = System.getenv(name);
+        return value == null || value.isBlank() ? fallback : Path.of(value);
     }
 
     @Subscribe
@@ -69,6 +112,7 @@ public final class DsWhitelistPlugin {
             logger.warn("Could not prepare " + dataDirectory, exception);
         }
         reloadIfChanged();
+        reloadArchivedIfChanged();
         proxy.getScheduler()
                 .buildTask(this, this::tick)
                 .delay(3, TimeUnit.SECONDS)
@@ -105,6 +149,7 @@ public final class DsWhitelistPlugin {
         if (reloadIfChanged()) {
             kickRemovedPlayers();
         }
+        reloadArchivedIfChanged();
         flushSeen();
     }
 
@@ -128,6 +173,9 @@ public final class DsWhitelistPlugin {
             return false;
         }
         try {
+            if (Files.size(whitelistFile) > MAX_WHITELIST_BYTES) {
+                throw new IOException("bigger than " + MAX_WHITELIST_BYTES + " bytes");
+            }
             Whitelist loaded = Whitelist.parse(Files.readAllLines(whitelistFile));
             whitelist = loaded;
             loadedModified = modified;
@@ -156,8 +204,57 @@ public final class DsWhitelistPlugin {
         }
     }
 
+    /* Re-reads archived.txt when it changed: archived worlds come off the server list, worlds
+       that are no longer archived go back on. Only the first column (the world's name) is used. */
+    private synchronized void reloadArchivedIfChanged() {
+        long modified;
+        try {
+            modified = Files.getLastModifiedTime(archivedFile).toMillis();
+        } catch (IOException missing) {
+            modified = Long.MIN_VALUE + 1;
+        }
+        if (modified == archivedModified) {
+            return;
+        }
+        archivedModified = modified;
+
+        Set<String> archived = new HashSet<>();
+        try {
+            if (Files.exists(archivedFile) && Files.size(archivedFile) <= MAX_ARCHIVED_BYTES) {
+                List<String> lines = Files.readAllLines(archivedFile);
+                for (String line : lines) {
+                    String name = line.split("\t", 2)[0].strip().toLowerCase(Locale.ROOT);
+                    if (!name.isEmpty() && !name.startsWith("#") && name.matches("[\\w.-]{1,40}")) {
+                        archived.add(name);
+                    }
+                }
+            }
+        } catch (IOException | RuntimeException exception) {
+            logger.warn("Could not read " + archivedFile + ", leaving the server list as it is", exception);
+            return;
+        }
+
+        for (RegisteredServer server : List.copyOf(proxy.getAllServers())) {
+            ServerInfo info = server.getServerInfo();
+            String name = info.getName().toLowerCase(Locale.ROOT);
+            if (archived.contains(name) && !hiddenServers.containsKey(name)) {
+                proxy.unregisterServer(info);
+                hiddenServers.put(name, info);
+                logger.info("Archived: took " + info.getName() + " off the server list");
+            }
+        }
+        for (String name : List.copyOf(hiddenServers.keySet())) {
+            if (!archived.contains(name)) {
+                ServerInfo info = hiddenServers.remove(name);
+                proxy.registerServer(info);
+                logger.info("No longer archived: put " + info.getName() + " back on the server list");
+            }
+        }
+    }
+
     private Component kickMessage(Whitelist current, Player player) {
-        String text = current.message().replace("{name}", player.getUsername());
+        // the name is escaped, so a name can never add tags of its own
+        String text = current.message().replace("{name}", MINI_MESSAGE.escapeTags(player.getUsername()));
         try {
             return MINI_MESSAGE.deserialize(text);
         } catch (RuntimeException badMarkup) {

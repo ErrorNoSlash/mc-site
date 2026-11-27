@@ -1,5 +1,7 @@
 // Requests, the whitelist and the history of changes live in small JSON files in DATA_DIR.
-// After every change the whitelist is also written to PLUGIN_DIR/whitelist.txt for the Velocity plugin.
+// After every change the whitelist is also written to EXPORT_DIR/whitelist.txt for the Velocity plugin.
+// Files other programs write (the plugin's seen.tsv, mc-backup's archived.txt) are only read, and
+// treated as untrusted: size-capped, and any line that doesn't look right is skipped.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -9,19 +11,24 @@ import { config } from "./config.js";
 const requestsFile = () => path.join(config.dataDir, "requests.json");
 const whitelistFile = () => path.join(config.dataDir, "whitelist.json");
 const activityFile = () => path.join(config.dataDir, "activity.json");
-const exportFile = () => path.join(config.pluginDir, "whitelist.txt");
-const seenFile = () => path.join(config.pluginDir, "seen.tsv");
+const loginsFile = () => path.join(config.dataDir, "logins.json");
+const exportFile = () => path.join(config.exportDir, "whitelist.txt");
 
 export const DEFAULT_MESSAGE =
     "<red>You're not on the whitelist yet.</red><newline><newline>"
     + "<gray>Request access at</gray> <white>{site}</white>";
 
-// the history keeps the newest changes only
+// the history keeps the newest changes only, the login list the last few logins
 const ACTIVITY_LIMIT = 300;
+const LOGINS_LIMIT = 10;
+// files from other programs bigger than this are not read at all
+const SEEN_MAX_BYTES = 5 * 1024 * 1024;
+const ARCHIVED_MAX_BYTES = 64 * 1024;
 
 let requests = [];
 let whitelist = { enforced: false, message: "", players: [] };
 let activity = [];
+let logins = [];
 let lastExportTime = 0;
 
 function readJson(file, fallback) {
@@ -41,7 +48,7 @@ function writeAtomic(file, text, mtimeMs) {
 }
 
 export function load() {
-    for (const directory of [config.dataDir, config.pluginDir]) {
+    for (const directory of [config.dataDir, config.exportDir]) {
         fs.mkdirSync(directory, { recursive: true });
         try {
             fs.accessSync(directory, fs.constants.W_OK);
@@ -57,6 +64,7 @@ export function load() {
         players: Array.isArray(stored.players) ? stored.players : [],
     };
     activity = readJson(activityFile(), null)?.activity || seedActivity();
+    logins = readJson(loginsFile(), { logins: [] }).logins || [];
     exportWhitelist();
 }
 
@@ -269,26 +277,81 @@ export function updateSettings({ enforced, message }) {
     return whitelist;
 }
 
-/* ---------- seen players (written by the plugin) ---------- */
+/* ---------- admin logins (for "last login" on the admin page) ---------- */
 
-export function readSeen() {
-    let text;
+export function recordLogin(login) {
+    logins.push({ at: new Date().toISOString(), ...login });
+    if (logins.length > LOGINS_LIMIT) logins = logins.slice(-LOGINS_LIMIT);
+    writeAtomic(loginsFile(), JSON.stringify({ version: 1, logins }, null, 2));
+}
+
+export function getLogins() {
+    return logins;
+}
+
+/* ---------- files other programs write: read-only, size-capped, checked line by line ---------- */
+
+function readSmallFile(file, maxBytes) {
     try {
-        text = fs.readFileSync(seenFile(), "utf8");
+        if (fs.statSync(file).size > maxBytes) return null;
+        return fs.readFileSync(file, "utf8");
     } catch {
-        return [];
+        return null;
     }
+}
+
+const UUID_TEXT = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
+const validTime = (value) => Number.isFinite(value) && value > 0 && value < 8.64e15;
+
+/* everyone who joined, as the plugin wrote it to seen.tsv */
+export function readSeen() {
+    const text = readSmallFile(config.seenFile, SEEN_MAX_BYTES);
+    if (!text) return [];
     return text.split("\n")
         .filter((line) => line && !line.startsWith("#"))
         .map((line) => {
             const [uuid, name, edition, firstSeen, lastSeen, logins, turnedAway] = line.split("\t");
-            return {
-                uuid, name, edition,
-                firstSeen: new Date(Number(firstSeen)).toISOString(),
-                lastSeen: new Date(Number(lastSeen)).toISOString(),
-                logins: Number(logins),
-                turnedAway: turnedAway === "true",
-            };
+            return { uuid, name, edition, firstSeen: Number(firstSeen), lastSeen: Number(lastSeen), logins: Number(logins), turnedAway };
         })
-        .filter((entry) => entry.uuid && entry.name);
+        .filter((entry) => UUID_TEXT.test(entry.uuid || "") && /^[.\w ]{1,32}$/.test(entry.name || "")
+            && (entry.edition === "java" || entry.edition === "bedrock")
+            && validTime(entry.firstSeen) && validTime(entry.lastSeen))
+        .slice(0, 5000)
+        .map((entry) => ({
+            uuid: entry.uuid, name: entry.name, edition: entry.edition,
+            firstSeen: new Date(entry.firstSeen).toISOString(),
+            lastSeen: new Date(entry.lastSeen).toISOString(),
+            logins: Number.isFinite(entry.logins) ? entry.logins : 0,
+            turnedAway: entry.turnedAway === "true",
+        }));
+}
+
+/* the archived worlds, as mc-backup --archive wrote them to archived.txt:
+   name <tab> when it was archived <tab> the archive's size in bytes */
+let archivedRead = { mtimeMs: -1, worlds: [] };
+
+export function readArchived() {
+    let mtimeMs;
+    try {
+        mtimeMs = fs.statSync(config.archivedFile).mtimeMs;
+    } catch {
+        return [];
+    }
+    if (mtimeMs === archivedRead.mtimeMs) return archivedRead.worlds;
+    const text = readSmallFile(config.archivedFile, ARCHIVED_MAX_BYTES) || "";
+    const worlds = text.split("\n")
+        .filter((line) => line && !line.startsWith("#"))
+        .map((line) => {
+            const [name, archivedAt, size] = line.split("\t");
+            return { name, archivedAt: Date.parse(archivedAt), size: Number(size) };
+        })
+        .filter((world) => /^[\w.-]{1,40}$/.test(world.name || "") && validTime(world.archivedAt))
+        .slice(0, 100)
+        .map((world) => ({
+            name: world.name,
+            archivedAt: new Date(world.archivedAt).toISOString(),
+            size: Number.isFinite(world.size) && world.size >= 0 ? world.size : null,
+        }));
+    archivedRead = { mtimeMs, worlds };
+    return worlds;
 }

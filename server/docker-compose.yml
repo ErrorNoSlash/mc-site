@@ -143,6 +143,9 @@ services:
       # (newest: https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest)
       VELOCITY_VERSION: "4.3.1"
       VELOCITY_BUILD_ID: "45"
+      # the whitelist plugin reads these read-only (the API can't write anywhere in the proxy's folder)
+      DS_WHITELIST_FILE: "/whitelist/whitelist.txt"
+      DS_ARCHIVED_FILE: "/archived/archived.txt"
       MODRINTH_PROJECTS: |
         viaversion:Fkfcr89K
         viabackwards:WFO37e8T
@@ -160,6 +163,8 @@ services:
       - "19132:19132/udp"
     volumes:
       - /data/minecraft/velocity:/server
+      - /data/minecraft/whitelist/export:/whitelist:ro
+      - /data/minecraft/archived:/archived:ro
     restart: unless-stopped
     networks:
       - mc-network
@@ -182,6 +187,9 @@ services:
     healthcheck:
       disable: true
 
+  # the worlds. archiving one (mc-backup --archive NAME) needs nothing changed here: it lists the world
+  # in /data/minecraft/archived/archived.txt (the proxy and the API read it) and sets MC_<NAME>=0 in .env,
+  # so mc-up leaves its server off. a new world needs the same "deploy: replicas: ${MC_<NAME>:-1}" lines.
   mc-survival:
     container_name: "MC-survival"
     image: itzg/minecraft-server:2026.11.1
@@ -193,14 +201,13 @@ services:
       <<: *fabric-proxy-env
     volumes:
       - /data/minecraft/survival:/data
+    # 0 when the world is archived (mc-backup --archive writes MC_SURVIVAL=0 to .env next to this file)
+    deploy:
+      replicas: ${MC_SURVIVAL:-1}
     restart: unless-stopped
     networks:
       - mc-network
 
-  # archiving a world you no longer play: mc-backup --archive NAME packs it away and stops it, then here
-  # give its service  profiles: ["archived"]  (so mc-up leaves it off), and take it out of [servers] in
-  # velocity.toml above and out of STATUS_SERVERS below. mc-backup --unarchive NAME and undoing those
-  # three brings it back.
   mc-anarchy:
     container_name: "MC-anarchy"
     image: itzg/minecraft-server:2026.11.1
@@ -212,6 +219,9 @@ services:
       <<: *fabric-proxy-env
     volumes:
       - /data/minecraft/anarchy:/data
+    # 0 when the world is archived (mc-backup --archive writes MC_ANARCHY=0 to .env next to this file)
+    deploy:
+      replicas: ${MC_ANARCHY:-1}
     restart: unless-stopped
     networks:
       - mc-network
@@ -227,6 +237,9 @@ services:
       <<: *fabric-proxy-env
     volumes:
       - /data/minecraft/survival-old:/data
+    # 0 when the world is archived (mc-backup --archive writes MC_SURVIVAL_OLD=0 to .env next to this file)
+    deploy:
+      replicas: ${MC_SURVIVAL_OLD:-1}
     restart: unless-stopped
     networks:
       - mc-network
@@ -252,31 +265,44 @@ services:
       ADMIN_NETWORKS: "10.0.0.0/24, 100.64.0.0/10, fd7a:115c:a1e0::/48"
       # first entry = the proxy everyone joins through; limbo is left out on purpose
       STATUS_SERVERS: "DS Network=velocity:25565, survival=mc-survival:25565, survival-old=mc-survival-old:25565, anarchy=mc-anarchy:25565"
-      # your own ntfy, straight over the Internal network (no TLS, no public hop)
+      # your own ntfy, straight over the mc-api network (no TLS, no public hop)
       NTFY_URL: "http://Ntfy"
       NTFY_TOPIC: "mc-whitelist"
       NTFY_PRIORITY: "4"
+      # where its files are: its own (read-write), whitelist.txt for the proxy, and the two it only reads
+      EXPORT_DIR: "/data/export"
+      SEEN_FILE: "/plugin/seen.tsv"
+      ARCHIVED_FILE: "/archived/archived.txt"
+    # least privilege: if the API were ever taken over, this is all it could touch.
+    # it writes only its own folder (requests, whitelist, history, and export/whitelist.txt for the
+    # proxy); the plugin's seen.tsv and the archived list are read-only; no worlds, no proxy folder
     volumes:
       - /data/minecraft/whitelist:/data
-      # the Velocity plugin's folder: the API writes whitelist.txt here, the plugin writes seen.tsv
-      - /data/minecraft/velocity/plugins/ds-whitelist:/plugin
+      - /data/minecraft/velocity/plugins/ds-whitelist:/plugin:ro
+      - /data/minecraft/archived:/archived:ro
     restart: unless-stopped
-    # locked down: read-only filesystem (only the two volumes are writable), no extra privileges
+    # read-only filesystem, a small /tmp nothing can run from, no Linux capabilities, no way to gain more
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:size=16m,noexec,nosuid,nodev
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # it can't eat the server: a quarter core, 256 MB, a few dozen processes
+    cpus: 0.25
+    mem_limit: 256m
+    pids_limit: 64
     networks:
       - mc-network   # to ping the Minecraft servers
-      - internal     # to reach Ntfy, and so Nginx Proxy Manager can reach the API
+      - mc-api       # only Nginx Proxy Manager and Ntfy: not the rest of your services
 
 networks:
   mc-network:
     driver: bridge
-  # the network from your main compose file (Nginx Proxy Manager, Ntfy, ...)
-  internal:
-    name: Internal
+  # a small network of its own between the API, Nginx Proxy Manager and Ntfy, so the API can't reach
+  # the rest of your services. made once with: docker network create mc-api; NPM and Ntfy join it in
+  # your main compose file
+  mc-api:
+    name: mc-api
     external: true

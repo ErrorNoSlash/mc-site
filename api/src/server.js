@@ -8,7 +8,7 @@ import { config, checkConfig } from "./config.js";
 import * as store from "./store.js";
 import { getStatus } from "./status.js";
 import { lookupJavaProfile } from "./mojang.js";
-import { notifyNewRequest, notifyDecision, notifyTest, verifyAction, ntfyEnabled } from "./notify.js";
+import { notifyNewRequest, notifyDecision, notifyTest, notifySecurity, verifyAction, ntfyEnabled } from "./notify.js";
 
 const log = (...parts) => console.log(new Date().toISOString(), ...parts);
 
@@ -97,7 +97,7 @@ function rateLimit(name, key, limit, windowSeconds) {
 setInterval(() => {
     const now = Date.now();
     for (const [id, bucket] of buckets) if (bucket.resetAt <= now) buckets.delete(id);
-    for (const [id, session] of sessions) if (session.expires <= now) sessions.delete(id);
+    for (const [id, session] of sessions) if (session.expires <= now || session.idleUntil <= now) sessions.delete(id);
 }, 60_000).unref();
 
 /* ---------- admin access ---------- */
@@ -120,8 +120,45 @@ function fromAdminNetwork(req) {
     return Boolean(type) && adminNetworks.check(ip, type);
 }
 
-// 10 wrong tokens from one address lock it out for 15 minutes; checked before the token is compared
+// where a login came from, in words, for the alerts and "last login"
+const tailscaleNetworks = new net.BlockList();
+tailscaleNetworks.addSubnet("100.64.0.0", 10, "ipv4");
+tailscaleNetworks.addSubnet("fd7a:115c:a1e0::", 48, "ipv6");
+
+function placeOf(ip) {
+    const clean = ip.replace(/^::ffff:/, "");
+    const type = net.isIPv6(clean) ? "ipv6" : "ipv4";
+    if (net.isIP(clean) && tailscaleNetworks.check(clean, type)) return "Tailscale";
+    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|f[cd])/i.test(clean)) return "the home network";
+    return "outside the home network";
+}
+
+// 10 wrong tokens from one address lock it out for 15 minutes; 30 from anywhere lock the login for
+// everyone for 15 minutes. both are checked before the token is compared, and both send an alert
 const lockout = { name: "admin-fail", limit: 10, seconds: 15 * 60 };
+const lockoutAll = { name: "admin-fail-all", key: "all", limit: 30, seconds: 15 * 60 };
+
+function checkLockouts(ip) {
+    checkLimit(lockoutAll.name, lockoutAll.key, lockoutAll.limit);
+    checkLimit(lockout.name, ip, lockout.limit);
+}
+
+/* counts a wrong token, and sends an alert when an address (or everyone) just got locked out */
+function wrongToken(ip) {
+    for (const [limit, key] of [[lockout, ip], [lockoutAll, lockoutAll.key]]) {
+        try {
+            rateLimit(limit.name, key, limit.limit, limit.seconds);
+        } catch {
+            // the limit is reached: the alert below has gone out already
+        }
+        if (buckets.get(`${limit.name}:${key}`)?.count === limit.limit) {
+            const who = limit === lockout ? `${ip} (${placeOf(ip)})` : "several addresses";
+            notifySecurity("Admin login locked", `${limit.limit} wrong admin tokens from ${who}. Logging in is blocked for 15 minutes${limit === lockout ? " from there" : " for everyone"}.`)
+                .catch((error) => log("ntfy:", error.message));
+        }
+    }
+    log("admin: wrong token from", hashIp(ip));
+}
 
 function tokenMatches(value) {
     const given = Buffer.from(String(value || ""));
@@ -142,10 +179,12 @@ function readSessionId(req) {
     return found ? found.slice(sessionCookie.length + 1) : "";
 }
 
+/* a login ends at its end time, or earlier after a while without using the admin (idle) */
 function startSession(res, remember) {
     const id = crypto.randomBytes(32).toString("base64url");
     const lifetime = remember ? config.rememberDays * 86400 : config.sessionHours * 3600;
-    sessions.set(id, { expires: Date.now() + lifetime * 1000 });
+    const idleMs = remember ? config.rememberIdleDays * 86400_000 : config.idleMinutes * 60_000;
+    sessions.set(id, { expires: Date.now() + lifetime * 1000, idleMs, idleUntil: Date.now() + idleMs });
     // without "remember" the cookie goes when the browser closes; the server forgets it after sessionHours anyway
     const maxAge = remember ? `; Max-Age=${lifetime}` : "";
     res.setHeader("Set-Cookie", `${sessionCookie}=${id}; Path=/; Secure; HttpOnly; SameSite=Strict${maxAge}`);
@@ -156,16 +195,26 @@ function endSession(req, res) {
     res.setHeader("Set-Cookie", `${sessionCookie}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0`);
 }
 
-function hasSession(req) {
+/* a call the page makes by itself (the 20 s refresh, ?auto=1) doesn't count as using the admin,
+   so an open tab nobody looks at still logs out after the idle time */
+function hasSession(req, isAuto = false) {
     const session = sessions.get(readSessionId(req));
-    return Boolean(session) && session.expires > Date.now();
+    const now = Date.now();
+    if (!session || session.expires <= now || session.idleUntil <= now) return false;
+    if (!isAuto) session.idleUntil = now + session.idleMs;
+    return true;
+}
+
+function activeSessions() {
+    const now = Date.now();
+    return [...sessions.values()].filter((session) => session.expires > now && session.idleUntil > now).length;
 }
 
 /* every admin route: a session cookie, or the token as "Authorization: Bearer" (for scripts and curl).
    a change made with the cookie must come from the site itself (Origin), on top of SameSite */
-function requireAdmin(req) {
+function requireAdmin(req, isAuto = false) {
     const ip = clientIp(req);
-    if (hasSession(req)) {
+    if (hasSession(req, isAuto)) {
         const origin = req.headers.origin;
         if (req.method !== "GET" && !config.allowedOrigins.includes(origin)) {
             throw new HttpError(403, "Changes only work from the admin page.");
@@ -174,9 +223,9 @@ function requireAdmin(req) {
     }
     const bearer = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     if (!bearer) throw new HttpError(401, "Log in first.");
-    checkLimit(lockout.name, ip, lockout.limit);
+    checkLockouts(ip);
     if (!tokenMatches(bearer)) {
-        rateLimit(lockout.name, ip, lockout.limit, lockout.seconds);
+        wrongToken(ip);
         throw new HttpError(401, "Wrong admin token.");
     }
 }
@@ -316,15 +365,19 @@ route("POST", /^\/api\/act\/([\w-]+)\/(approve|deny)$/, async (req, res, url, [i
 
 route("POST", /^\/api\/admin\/login$/, async (req, res) => {
     const ip = clientIp(req);
-    checkLimit(lockout.name, ip, lockout.limit);
+    checkLockouts(ip);
     const body = await readJsonBody(req);
     if (!tokenMatches(String(body.token || "").trim())) {
-        rateLimit(lockout.name, ip, lockout.limit, lockout.seconds);
-        log("admin: wrong token from", hashIp(ip));
+        wrongToken(ip);
         throw new HttpError(401, "Wrong admin token.");
     }
-    startSession(res, body.remember === true);
-    log("admin: logged in from", hashIp(ip), body.remember === true ? "(remembered)" : "");
+    const remember = body.remember === true;
+    startSession(res, remember);
+    store.recordLogin({ ip, from: placeOf(ip), remember });
+    log("admin: logged in from", hashIp(ip), remember ? "(remembered)" : "");
+    // an alert for every login, so one that wasn't you stands out
+    notifySecurity("Admin login", `Someone logged in to the admin from ${ip} (${placeOf(ip)})${remember ? ", remembered for 30 days" : ""}. Not you? Open the admin and press "log out everywhere".`)
+        .catch((error) => log("ntfy:", error.message));
     return { ok: true };
 });
 
@@ -333,8 +386,18 @@ route("POST", /^\/api\/admin\/logout$/, (req, res) => {
     return { ok: true };
 });
 
-route("GET", /^\/api\/admin\/overview$/, (req) => {
+/* ends every login on every device, this one too */
+route("POST", /^\/api\/admin\/logout-everywhere$/, (req, res) => {
     requireAdmin(req);
+    const count = activeSessions();
+    sessions.clear();
+    endSession(req, res);
+    log(`admin: logged out everywhere (${count} sessions)`);
+    return { ok: true };
+});
+
+route("GET", /^\/api\/admin\/overview$/, (req, res, url) => {
+    requireAdmin(req, url.searchParams.get("auto") === "1");
     const whitelist = store.getWhitelist();
     const listedUuids = new Set(whitelist.players.map((player) => player.uuid).filter(Boolean));
     const listedKeys = new Set(whitelist.players.map((player) => player.key));
@@ -349,6 +412,12 @@ route("GET", /^\/api\/admin\/overview$/, (req) => {
         seen,
         activity: store.getActivity().slice(-100).reverse(),
         ntfy: ntfyEnabled(),
+        // the login before this one, and how many devices are logged in now
+        security: {
+            previousLogin: store.getLogins().slice(-2, -1)[0] || null,
+            sessions: activeSessions(),
+            idleMinutes: config.idleMinutes,
+        },
     };
 });
 

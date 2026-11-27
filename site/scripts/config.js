@@ -20,8 +20,8 @@ const site = {
     // the whole skin in the player popup, the same way
     skinsUrl: "https://mc-heads.net/body/{name}/120",
 
-    // a short line about each server in its popup, by the name the status gives it (any case);
-    // a server that isn't here gets no line
+    // a short line about each server in its popup (and about each archived world in the archived
+    // list), by the name the status gives it, any case; a server that isn't here gets no line
     serverInfo: {
         "ds network": "The address everyone joins: one network that holds the worlds below, for Java and Bedrock alike.",
         "survival": "The main world: plain survival with friends. Build, explore, and leave other people's things alone.",

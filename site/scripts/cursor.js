@@ -6,7 +6,7 @@ const cursorOutline = document.querySelector("[data-cursor-outline]");
 const cursorFollow = 0.2;
 const cursorGrow = 2;
 const cursorPress = 0.8;
-const cursorLinks = "a, button, label, input, textarea, select, summary, [data-copy], [data-server], .splash, .slot[data-name]";
+const cursorLinks = "a, button, label, input, textarea, select, summary, [data-copy], [data-server], [data-archive], .splash, .slot[data-name]";
 
 let pointerX = -100;
 let pointerY = -100;

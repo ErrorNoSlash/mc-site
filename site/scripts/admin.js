@@ -12,6 +12,7 @@ const loginOutput = document.querySelector("#login-output");
 const sheet = document.querySelector(".sheet");
 const adminView = document.querySelector("#admin-view");
 const logoutButton = document.querySelector("#logout");
+const securityLine = document.querySelector("#security-line");
 const notice = document.querySelector("#notice");
 const enforceButton = document.querySelector("#enforce");
 const messageForm = document.querySelector("#message-form");
@@ -27,6 +28,8 @@ const confirmYes = document.querySelector("#confirm-yes");
 
 let isLoggedIn = false;
 let overview = null;
+// a login ends after a while without clicking anything, or at its end time (the API decides)
+const loggedOutText = "logged out: unused for a while, or the login reached its end. log in again";
 let renderedKey = "";
 let messageDirty = false;
 let noticeTimer = null;
@@ -58,6 +61,7 @@ function showLogin(message) {
     adminView.hidden = true;
     loginScreen.hidden = false;
     logoutButton.hidden = true;
+    securityLine.hidden = true;
     if (message) {
         loginOutput.dataset.tone = "error";
         loginOutput.replaceChildren(h("span", null, "> " + message));
@@ -130,7 +134,7 @@ async function act(promise, success) {
     } catch (error) {
         if (error.status === 401) {
             isLoggedIn = false;
-            showLogin("your login ran out, log in again");
+            showLogin(loggedOutText);
             return false;
         }
         flash(error.message, true);
@@ -481,21 +485,36 @@ function render(data) {
         messageBox.value = data.whitelist.message || data.whitelist.defaultMessage;
         renderMessagePreview();
     }
+
+    renderSecurity(data.security);
 }
 
-/*loads everything; without a valid session cookie that is the login screen*/
-async function load() {
+/*the footer's line: when and from where the login before this one was, and how many are open*/
+function renderSecurity(security) {
+    if (!security) return;
+    const before = security.previousLogin;
+    const devices = security.sessions + (security.sessions === 1 ? " login open" : " logins open");
+    document.querySelector("#security-text").textContent =
+        (before ? "login before this: " + timeAgo(before.at) + " from " + before.from + " (" + before.ip + ")" : "first login") + " · " + devices;
+}
+
+/*loads everything; without a valid session cookie that is the login screen. the page's own
+  refreshes say so (auto), so they don't keep an unused login alive*/
+async function load(auto) {
     try {
-        render(await adminApi("/api/admin/overview"));
+        render(await adminApi("/api/admin/overview" + (auto ? "?auto=1" : "")));
         isLoggedIn = true;
         loginScreen.hidden = true;
         adminView.hidden = false;
         logoutButton.hidden = false;
+        securityLine.hidden = false;
     } catch (error) {
         if (error.status === 401) {
             const wasLoggedIn = isLoggedIn;
             isLoggedIn = false;
-            return showLogin(wasLoggedIn ? "your login ran out, log in again" : "");
+            overview = null;
+            renderedKey = "";
+            return showLogin(wasLoggedIn ? loggedOutText : "");
         }
         if (adminView.hidden) showLogin(loginProblem(error));
         else flash(error.message, true);
@@ -532,6 +551,22 @@ logoutButton.addEventListener("click", async function () {
     overview = null;
     renderedKey = "";
     showLogin();
+});
+
+/* ends every login, on every device: for a login you don't remember */
+document.querySelector("#logout-everywhere").addEventListener("click", async function () {
+    const open = overview && overview.security ? overview.security.sessions : 0;
+    const text = (open > 1 ? open + " logins are open. " : "") + "Every device is logged out, this one too, and needs the token again.";
+    if (!await askConfirm("Log out everywhere?", text, "Log out all")) return;
+    try {
+        await adminApi("/api/admin/logout-everywhere", { method: "POST", body: {} });
+    } catch (error) {
+        if (error.status !== 401) return flash(error.message, true);
+    }
+    isLoggedIn = false;
+    overview = null;
+    renderedKey = "";
+    showLogin("logged out everywhere");
 });
 
 /* the switch asks first, both ways */
@@ -621,5 +656,10 @@ setTitleWord("ADMIN");
 forgetOldToken();
 load();
 setInterval(function () {
-    if (isLoggedIn && !document.hidden && !adminView.hidden) load();
+    if (isLoggedIn && !document.hidden && !adminView.hidden) load(true);
 }, 20000);
+
+// back on the tab: check straight away, so a login that ran out meanwhile doesn't keep showing the lists
+document.addEventListener("visibilitychange", function () {
+    if (isLoggedIn && !document.hidden) load(true);
+});

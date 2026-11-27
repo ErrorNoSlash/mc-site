@@ -639,8 +639,13 @@ textarea {
     }
 
     /* it opens its server popup */
-    &[data-server] {
+    &:is([data-server], [data-archive]) {
         cursor: pointer;
+    }
+
+    /* the archived worlds: last, quieter than the live ones */
+    &.is-archive {
+        opacity: 0.7;
     }
 
     .server-number {
@@ -892,6 +897,19 @@ textarea {
         padding: 0.6rem 0.75rem;
         border: var(--line-width) dashed var(--line-color);
     }
+}
+
+/* the admin footer's login line: the text, then "log out everywhere" */
+.security-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+}
+
+/* inside someone else's frame (firstPaint.js): nothing to see or click */
+html.is-framed body {
+    display: none;
 }
 
 /* a button that looks like an underlined link */
@@ -1358,6 +1376,11 @@ body.popup-open .sheet :is(*, *::before, *::after) {
         opacity: 0.45;
     }
 
+    /* an archived world: only something to read, so no outline when pointed at */
+    &.is-archived:hover {
+        border-color: transparent;
+    }
+
     /* the proxy: click to copy its address */
     &.is-network {
         cursor: copy;
@@ -1381,6 +1404,11 @@ body.popup-open .sheet :is(*, *::before, *::after) {
 .mc-icon {
     width: 2.5rem;
     height: 2.5rem;
+}
+
+/* an archived world's lines wrap instead of being cut off */
+.mc-entry.is-archived small {
+    white-space: normal;
 }
 
 /* players and ping bars on the right of an entry */

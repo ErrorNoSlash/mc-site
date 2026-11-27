@@ -49,8 +49,9 @@
 **1. Folders on the server.** The API and the itzg images all run as uid 1000:
 
 ```bash
-sudo mkdir -p /data/minecraft/whitelist /data/minecraft/velocity/plugins/ds-whitelist
+sudo mkdir -p /data/minecraft/whitelist/export /data/minecraft/velocity/plugins/ds-whitelist /data/minecraft/archived
 sudo chown -R 1000:1000 /data/minecraft/whitelist /data/minecraft/velocity/plugins/ds-whitelist
+sudo chown $USER: /data/minecraft/archived   # mc-backup --archive writes the list of archived worlds here
 ```
 
 **2. The plugin.** Download it from **Actions → Build plugin → the latest green run → Artifacts → ds-whitelist**, and copy the jar into Velocity's plugins folder. It needs Velocity 4 on Java 25, which `itzg/mc-proxy:java25` has.
@@ -60,7 +61,13 @@ cp ds-whitelist-1.0.0.jar /data/minecraft/velocity/plugins/
 gh attestation verify ds-whitelist-1.0.0.jar -R ErrorNoSlash/mc-site   # optional: proves it was built here
 ```
 
-**3. The API.** Clone this repo next to your Minecraft `docker-compose.yml` as `mc-site/`, and copy the `whitelist-api` service and the `internal` network from [`server/docker-compose.yml`](server/docker-compose.yml). Secrets live in the sops-encrypted `secrets.yaml` of the NixOS config, like `VELOCITY_SECRET`; the stack is started with `sops exec-env` (the `mc-up` alias). Add the admin token without it ever showing on screen:
+**3. The API.** Clone this repo next to your Minecraft `docker-compose.yml` as `mc-site/`, and copy the `whitelist-api` service, Velocity's extra mounts and the `mc-api` network from [`server/docker-compose.yml`](server/docker-compose.yml). The API gets a small network of its own with only Nginx Proxy Manager and Ntfy on it:
+
+```bash
+docker network create mc-api        # then add mc-api (external) to NPM and Ntfy in your main compose file
+```
+
+Secrets live in the sops-encrypted `secrets.yaml` of the NixOS config, like `VELOCITY_SECRET`; the stack is started with `sops exec-env` (the `mc-up` alias). Add the admin token without it ever showing on screen:
 
 ```bash
 sops set ~/nixos-config/secrets.yaml '["WHITELIST_ADMIN_TOKEN"]' "\"$(head -c 32 /dev/urandom | sha256sum | cut -d' ' -f1)\""
@@ -80,7 +87,7 @@ docker exec -it Ntfy ntfy token add mc-whitelist                     # tk_…  �
 docker exec -it Ntfy ntfy access YOUR_USER mc-whitelist read-only    # so your phone may subscribe
 ```
 
-Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin page. If it fails, the admin page says why: `ENOTFOUND` means the API isn't on the `Internal` network, and `401/403` means the token or its access is wrong.
+Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin page. If it fails, the admin page says why: `ENOTFOUND` means Ntfy isn't on the `mc-api` network, and `401/403` means the token or its access is wrong.
 
 **6. Turn it on.** Open [`join.errornoslash.be/admin.html`](https://join.errornoslash.be/admin.html), paste the token (`sops -d --extract '["WHITELIST_ADMIN_TOKEN"]' ~/nixos-config/secrets.yaml`), add yourself, let the regulars join once, press **add all**, then switch **OFF** to **ON**.
 
@@ -115,8 +122,11 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | -------------- | ------------------------------------------------------------------------------------- |
 | **workflows**  | every action pinned to a full commit SHA, no permissions by default, Dependabot weekly |
 | **plugin jar** | built in GitHub Actions with a signed build-provenance attestation                    |
-| **container**  | Node 26 LTS, unprivileged user, read-only filesystem, no Linux capabilities           |
-| **admin**      | only from home or Tailscale; the token is swapped for an HttpOnly session cookie, never stored; 10 wrong tries lock an address out for 15 min |
+| **container**  | Node 26 LTS, unprivileged user, read-only filesystem, no Linux capabilities, a `noexec` `/tmp`, ¼ core, 256 MB and 64 processes at most |
+| **if the API were taken over** | it writes only its own folder; the plugin's `seen.tsv` and the archived list are mounted read-only, the worlds and the proxy's folder not at all; its network reaches only NPM, Ntfy and the game servers; its ntfy token can only post to `mc-whitelist` |
+| **plugin**     | treats the API's `whitelist.txt` as untrusted: size limits, every line checked, the kick message can only use colours and text styles (no clicks, links or hovers), the player's name can't add tags |
+| **admin**      | only from home or Tailscale; the token is swapped for an HttpOnly session cookie, never stored; a login ends after 30 min unused (7 days with remember) and after 12 h at most (30 days); every login and lockout is pushed to ntfy; 10 wrong tries lock an address out for 15 min, 30 from anywhere lock everyone out; the page shows the login before yours and can log out every device |
+| **site**       | https only, a strict Content-Security-Policy, API answers drawn as text (never HTML), the pages hide themselves inside someone else's frame |
 | **requests**   | Java names checked with Mojang, 3 an hour per address, a hidden field for bots        |
 | **whitelist**  | Java by UUID, Bedrock by Floodgate name (Java names can't contain the dot)            |
 | **ntfy buttons** | signed links that work once and expire after 7 days                                 |
@@ -136,7 +146,8 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | `POST`   | `/api/act/:id/approve\|deny?exp=&sig=`      | signed ntfy link |
 | `POST`   | `/api/admin/login` `{token, remember}`      | token → cookie   |
 | `POST`   | `/api/admin/logout`                         | session          |
-| `GET`    | `/api/admin/overview`                       | session / token  |
+| `POST`   | `/api/admin/logout-everywhere`              | session / token  |
+| `GET`    | `/api/admin/overview` (`?auto=1` doesn't count as use) | session / token |
 | `POST`   | `/api/admin/requests/:id/approve\|deny`     | session / token  |
 | `DELETE` | `/api/admin/requests/:id`                   | session / token  |
 | `POST`   | `/api/admin/players` `{edition, name}`      | session / token  |
@@ -152,8 +163,14 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | `PUBLIC_API_URL`            |                             | the API's https address, for the ntfy buttons    |
 | `CLIENT_IP_HEADER`          |                             | the header holding the visitor's address         |
 | `ADMIN_NETWORKS`            | anywhere                    | networks the admin works from, `10.0.0.0/24, …`  |
-| `SESSION_HOURS`             | `12`                        | how long a login lasts                           |
+| `SESSION_HOURS`             | `12`                        | how long a login lasts at most                   |
 | `REMEMBER_DAYS`             | `30`                        | the same with "remember on this device"          |
+| `IDLE_MINUTES`              | `30`                        | a login ends after this long unused              |
+| `REMEMBER_IDLE_DAYS`        | `7`                         | the same with "remember on this device"          |
+| `DATA_DIR`                  | `/data`                     | the API's own files (read-write)                 |
+| `EXPORT_DIR`                | `PLUGIN_DIR`                | where `whitelist.txt` for the plugin goes        |
+| `SEEN_FILE`                 | `PLUGIN_DIR/seen.tsv`       | who joined, written by the plugin (read-only)    |
+| `ARCHIVED_FILE`             | `/archived/archived.txt`    | the archived worlds, written by `mc-backup` (read-only) |
 | `STATUS_SERVERS`            | `DS Network=velocity:25565` | `name=host:port, …`; the first is the proxy      |
 | `STATUS_CACHE_SECONDS`      | `15`                        | how often the servers are pinged at most         |
 | `STATUS_SHOW_PLAYERS`       | `true`                      | show online player names                         |
@@ -164,7 +181,7 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | `NTFY_TOPIC` / `NTFY_TOKEN` |                             | the topic and access token                       |
 | `NTFY_PRIORITY`             | `3`                         | 1 to 5; compose sets `4` so requests buzz        |
 
-Data lives in `/data/minecraft/whitelist/` (`requests.json`, `whitelist.json`). `mc-backup` ([`server/backup.fish`](server/backup.fish)) backs it up with the worlds: `mc-backup` for everything, `mc-backup survival anarchy` for some, `--list`, `--keep N`, `--to DIR`, `--restore NAME`. A world you no longer play: `mc-backup --archive NAME` packs it away for good (kept in `<backups>/archive`, never thinned out), stops its server and can free its space; `--unarchive NAME` brings it back. The script prints the three compose-file lines to change.
+Data lives in `/data/minecraft/whitelist/` (`requests.json`, `whitelist.json`, `logins.json`, and `export/whitelist.txt` for the plugin). `mc-backup` ([`server/backup.fish`](server/backup.fish)) backs it up with the worlds: `mc-backup` for everything, `mc-backup survival anarchy` for some, `--list`, `--keep N`, `--to DIR`, `--restore NAME`. A world you no longer play: `mc-backup --archive NAME` packs it away for good (kept in `<backups>/archive`, never thinned out), stops its server and can free its space; `--unarchive NAME` brings it back, then `mc-up`. Nothing else changes: the script lists the world in `/data/minecraft/archived/archived.txt` (the proxy drops it from its server list within seconds, the status and the site show it under archived worlds with its date and size) and sets `MC_<NAME>=0` in the stack's `.env`, so `mc-up` leaves it off. A new world needs `deploy: replicas: ${MC_<NAME>:-1}` in its service, like the others.
 
 </details>
 

@@ -1,8 +1,9 @@
 // Minecraft "server list ping": the same request the multiplayer screen sends.
-// Pings every server in STATUS_SERVERS straight over the Docker network.
+// Pings every server in STATUS_SERVERS straight over the Docker network, except archived worlds.
 
 import net from "node:net";
 import { config } from "./config.js";
+import { readArchived } from "./store.js";
 
 function writeVarInt(value) {
     const bytes = [];
@@ -125,10 +126,14 @@ export async function getStatus() {
     if (inFlight) return inFlight;
 
     inFlight = (async () => {
-        const results = await Promise.all(config.servers.map((server) => ping(server.host, server.port)));
-        const summaries = config.servers.map((server, index) => summarise(server, results[index]));
+        // archived worlds (mc-backup --archive) are not pinged or shown; they are listed apart
+        const archived = readArchived();
+        const archivedNames = new Set(archived.map((world) => world.name.toLowerCase()));
+        const live = config.servers.filter((server, index) => index === 0 || !archivedNames.has(server.name.toLowerCase()));
+        const results = await Promise.all(live.map((server) => ping(server.host, server.port)));
+        const summaries = live.map((server, index) => summarise(server, results[index]));
         const [network, ...servers] = summaries;
-        cached = { updatedAt: new Date().toISOString(), network, servers };
+        cached = { updatedAt: new Date().toISOString(), network, servers, archived };
         cachedAt = Date.now();
         return cached;
     })().finally(() => {

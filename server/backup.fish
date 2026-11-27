@@ -13,12 +13,18 @@
 #   mc-backup --unarchive survival-old  bring an archived world back (or give a file after the name)
 #
 # archives live in <backups>/archive and are never thinned out by --keep.
+# archiving is all there is to do: the world goes into /data/minecraft/archived/archived.txt (the
+# proxy takes it off its server list, the API and website list it as archived) and its server is
+# switched off in the stack's .env (MC_<NAME>=0), so mc-up leaves it off. unarchiving undoes both.
 #
 # a running server is told to stop writing to its world while it is copied (save-off), and to
 # carry on afterwards, so the copy is never half-saved. players can keep playing.
 
 set -l source_dir (set -q MC_DATA; and echo $MC_DATA; or echo /data/minecraft)
 set -l default_dest $HOME/backups/minecraft
+# the list of archived worlds (read-only for the proxy and the API) and the stack's own settings
+set -l archived_list $source_dir/archived/archived.txt
+set -l stack_env (set -q MC_STACK; and echo $MC_STACK; or echo $HOME/Docker/stacks/minecraft)/.env
 
 # things the servers download again by themselves; leaving them out keeps the backups small
 set -l excludes logs crash-reports debug .cache cache libraries versions
@@ -46,6 +52,28 @@ function targets --argument-names source_dir
         set -l name (basename $dir)
         string match -q -- '*.before-restore-*' $name; or echo $name
     end
+end
+
+# MC_SURVIVAL_OLD for survival-old: the setting in .env that says how many of its server run
+function env_name --argument-names name
+    echo MC_(string upper -- $name | string replace -ra '[^A-Z0-9]' _)
+end
+
+# sets (or with no value, removes) one line in a "key<separator>value" file, keeping the rest
+function set_line --argument-names file key separator value
+    set -l kept
+    if test -f $file
+        for line in (cat $file)
+            string match -q -- "$key$separator*" $line; or set -a kept $line
+        end
+    end
+    test -n "$value"; and set -a kept "$key$separator$value"
+    if test (count $kept) -gt 0
+        printf '%s\n' $kept >$file.tmp
+    else
+        true >$file.tmp
+    end
+    and mv $file.tmp $file
 end
 
 # whether a folder holds a world (a level.dat one level down)
@@ -124,8 +152,8 @@ end
 
 if set -q _flag_archive
     set -l name $argv[1]
-    if not contains -- "$name" $all
-        fail "which one? one of: $all"
+    if not contains -- "$name" $all; or contains -- "$name" archived whitelist velocity
+        fail "which one? one of: "(string join " " (string match -v -r '^(archived|whitelist|velocity)$' -- $all))
         exit 1
     end
     set -l dir $source_dir/$name
@@ -166,14 +194,15 @@ if set -q _flag_archive
         say "kept $dir; it still gets backed up with the rest until you delete it"
     end
 
-    # the server is still in the compose file: without these, the next mc-up starts it again
-    # (on an empty folder that means a brand new world)
-    echo
-    say "last step, in the repo's server/docker-compose.yml:"
-    echo "    1. under the mc-$name service, add:  profiles: [\"archived\"]"
-    echo "    2. in velocity.toml's [servers], delete:  $name = \"mc-$name:25565\""
-    echo "    3. in STATUS_SERVERS, delete:  $name=mc-$name:25565"
-    echo "  then push, git pull on the server, copy the compose file and run mc-up."
+    # the proxy, the API and the website read this list; .env keeps its server off on every mc-up
+    mkdir -p (path dirname $archived_list)
+    if not set_line $archived_list $name \t (date -u +%Y-%m-%dT%H:%M:%SZ)\t(stat -c %s $out)
+        fail "couldn't write $archived_list; run: sudo chown $USER: "(path dirname $archived_list)", then --archive $name again"
+        exit 1
+    end
+    set_line $stack_env (env_name $name) = 0
+    say "archived: the proxy takes $name off its server list within a few seconds, the website lists it as archived,"
+    say "and mc-up leaves its server off (from $stack_env). nothing else to do."
     exit 0
 end
 
@@ -207,12 +236,11 @@ if set -q _flag_unarchive
     mkdir -p $dir; and tar -xf $file -C $dir
     or begin; fail "unpacking failed"; exit 1; end
     say "$name is back in $dir, from "(path basename $file)"; the archive stays where it is"
-    echo
-    say "last step, in the repo's server/docker-compose.yml, undo the archive:"
-    echo "    1. under the mc-$name service, remove:  profiles: [\"archived\"]"
-    echo "    2. in velocity.toml's [servers], add back:  $name = \"mc-$name:25565\""
-    echo "    3. in STATUS_SERVERS, add back:  $name=mc-$name:25565"
-    echo "  then push, git pull on the server, copy the compose file and run mc-up."
+
+    # off the archived list, and its server allowed to run again
+    test -f $archived_list; and set_line $archived_list $name \t ""
+    set_line $stack_env (env_name $name) = ""
+    say "run mc-up to start its server; the proxy puts it back on its server list by itself."
     exit 0
 end
 

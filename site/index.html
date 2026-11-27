@@ -240,6 +240,22 @@
             </nav>
         </section>
 
+        <!-- archived worlds, like the game's world list (popups.js; the list comes with the status) -->
+        <section class="panel" id="panel-archive" role="dialog" aria-modal="true" aria-labelledby="panel-archive-title" hidden>
+            <div class="panel-head">
+                <h2 id="panel-archive-title">Archived Worlds</h2>
+                <button class="mc-close" type="button" data-close aria-label="Close">&#10005;</button>
+            </div>
+            <div class="panel-body">
+                <p class="info-about">Worlds nobody plays any more, packed away so nothing built there gets lost.</p>
+                <div class="mc-list" id="panel-archive-list"></div>
+            </div>
+            <div class="panel-buttons">
+                <button class="mc-button" type="button" data-panel="status">Server List</button>
+                <button class="mc-button" type="button" data-close>Done</button>
+            </div>
+        </section>
+
         <!-- a server: a line about it and how it is doing (popups.js) -->
         <section class="panel is-player" id="panel-server" role="dialog" aria-modal="true" aria-labelledby="panel-server-title" hidden>
             <div class="panel-head">

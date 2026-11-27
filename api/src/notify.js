@@ -100,6 +100,19 @@ export async function notifyTest() {
     });
 }
 
+/* security: a login on the admin page, or someone guessing tokens. you hear about it straight away,
+   so a login that wasn't you stands out */
+export async function notifySecurity(title, message) {
+    const adminUrl = config.siteUrl ? `${config.siteUrl}/admin.html` : undefined;
+    await publish({
+        title,
+        message,
+        tags: ["lock"],
+        priority: config.ntfy.priority,
+        click: adminUrl,
+    });
+}
+
 export async function notifyDecision(request, via) {
     if (via !== "ntfy") return; // the admin page shows the result itself
     await publish({

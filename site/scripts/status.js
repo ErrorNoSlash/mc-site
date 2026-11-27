@@ -158,7 +158,8 @@ function render(status) {
     renderHotbar(status);
     serverList.replaceChildren(
         serverRow(network, 0, true),
-        ...status.servers.map(function (server, index) { return serverRow(server, index + 1, false); })
+        ...status.servers.map(function (server, index) { return serverRow(server, index + 1, false); }),
+        ...archiveRows(status.archived)
     );
 
     const up = status.servers.filter(function (server) { return server.online; }).map(function (server) { return server.name.toUpperCase(); });
@@ -171,6 +172,21 @@ function render(status) {
     lastStatus = status;
     showUpdated();
     document.dispatchEvent(new CustomEvent("status", { detail: status }));
+}
+
+/*the last row: the archived worlds (mc-backup --archive on the server), when there are any;
+  it opens their popup (popups.js)*/
+function archiveRows(worlds) {
+    if (!worlds || worlds.length === 0) return [];
+    const names = worlds.map(function (world) { return world.name; }).join(", ");
+    return [h("div", { class: "server-row is-archive", role: "button", tabindex: "0", "aria-label": "Archived worlds", "data-archive": "" },
+        h("span", { class: "server-number" }, "--"),
+        h("span", null,
+            h("b", { class: "server-name" }, "archived worlds"),
+            h("small", { class: "server-detail" }, worlds.length + (worlds.length === 1 ? " world" : " worlds") + " packed away · " + names)
+        ),
+        h("span", { class: "server-state" }, "→")
+    )];
 }
 
 /*empty slots until the first answer*/

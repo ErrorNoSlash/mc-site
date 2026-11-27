@@ -1,5 +1,6 @@
 /*ds/, status? and join? open a popup drawn like the game's menu screens: contact links, the server list or the request form.
-  a server in either server list opens that server, a head in the hotbar (or in a server popup) that player*/
+  a server in either server list opens that server, a head in the hotbar (or in a server popup) that player,
+  and the archived worlds row their list*/
 const veil = document.querySelector("#veil");
 const sheet = document.querySelector(".sheet");
 const panels = [...veil.querySelectorAll(".panel")];
@@ -15,6 +16,14 @@ function serverIcon(isNetwork) {
         ? [[0, 0, 8, 8, 0.25], [0, 0, 8, 2, 0.9], [0, 2, 8, 1, 0.55], [1, 4, 1, 1, 0.6], [5, 5, 1, 1, 0.6], [3, 6, 1, 1, 0.6], [6, 3, 1, 1, 0.6]]
         : [[0, 0, 8, 8, 0.25], [0, 0, 8, 2, 0.75], [0, 2, 3, 1, 0.5], [5, 2, 3, 1, 0.5], [2, 5, 1, 1, 0.6], [6, 6, 1, 1, 0.6]];
     const icon = pixelSvg(8, 8, rects);
+    icon.classList.add("mc-icon");
+    return icon;
+}
+
+/*an archived world: a closed chest*/
+function chestIcon() {
+    const icon = pixelSvg(8, 8, [[0, 1, 8, 7, 0.25], [0, 1, 8, 1, 0.75], [0, 3, 8, 1, 0.75], [0, 7, 8, 1, 0.75],
+        [0, 1, 1, 7, 0.75], [7, 1, 1, 7, 0.75], [3, 3, 2, 2, 0.95]]);
     icon.classList.add("mc-icon");
     return icon;
 }
@@ -74,6 +83,37 @@ function fillPlayerPanel(name) {
     document.querySelector("#panel-player-buttons").replaceChildren(...buttons);
 }
 
+/* archived worlds, like the game's world list: the name, when it was archived and how big the
+   archive is (from the status), and its line from config.js. newest first */
+function sizeText(bytes) {
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let size = bytes;
+    let unit = 0;
+    while (size >= 1024 && unit < units.length - 1) {
+        size /= 1024;
+        unit++;
+    }
+    return (size >= 10 || unit === 0 ? Math.round(size) : size.toFixed(1)) + " " + units[unit];
+}
+
+function archiveEntry(world) {
+    const archivedOn = new Date(world.archivedAt).toLocaleDateString([], { month: "short", year: "numeric" });
+    const about = site.serverInfo[world.name.toLowerCase()];
+    return h("div", { class: "mc-entry is-archived" },
+        chestIcon(),
+        h("span", { class: "mc-entry-text" },
+            h("b", null, world.name),
+            h("small", null, "archived " + archivedOn + (typeof world.size === "number" ? " · " + sizeText(world.size) : "")),
+            about ? h("small", null, about) : null
+        )
+    );
+}
+
+function fillArchivePanel(worlds) {
+    const newestFirst = [...(worlds || [])].sort(function (a, b) { return b.archivedAt.localeCompare(a.archivedAt); });
+    document.querySelector("#panel-archive-list").replaceChildren(...newestFirst.map(archiveEntry));
+}
+
 /* a server: a line about it from config.js and what the status says, with who's on as heads that
    open their player. the popup follows the live status while it is open */
 let openServerKey = null;
@@ -130,7 +170,7 @@ function panelFor(tab) {
 
 /* open and close, like the contact site's who? / links? */
 function showPanel(panelName) {
-    const isPanelName = ["status", "join", "contact", "player", "server"].includes(panelName);
+    const isPanelName = ["status", "join", "contact", "player", "server", "archive"].includes(panelName);
     if (panelName !== "server") openServerKey = null;
 
     if (isPanelName) {
@@ -192,8 +232,9 @@ panelCheck.addEventListener("click", function () {
     panelCheck.textContent = pageModeToggle.textContent.replace(/(^|\s)\S/g, function (letter) { return letter.toUpperCase(); });
 });
 
-// the popups follow the live status while they are open
+// the popups follow the live status while they are open; the archived list always does
 document.addEventListener("status", function (e) {
+    fillArchivePanel(e.detail.archived);
     if (!document.querySelector("#panel-status").hidden) fillStatusPanel(e.detail);
     if (openServerKey && !document.querySelector("#panel-server").hidden) fillServerPanel(openServerKey);
 });
@@ -202,26 +243,31 @@ window.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && veil.classList.contains("is-open")) closePanel();
 });
 
-/* a server row on the page opens its server, by click, tap, Enter or Space */
+/* a server: fill its popup and show it */
 function openServer(key) {
     openServerKey = key;
     fillServerPanel(key);
     showPanel("server");
 }
 
-serverList.addEventListener("click", function (e) {
-    const row = e.target.closest("[data-server]");
-    if (!row) return;
+/* a server row on the page opens its server, the archived worlds row their list; by click, tap,
+   Enter or Space */
+function openRow(row) {
     lastClickedTab = row;
-    openServer(row.dataset.server);
+    if (row.hasAttribute("data-archive")) showPanel("archive");
+    else openServer(row.dataset.server);
+}
+
+serverList.addEventListener("click", function (e) {
+    const row = e.target.closest("[data-server], [data-archive]");
+    if (row) openRow(row);
 });
 
 serverList.addEventListener("keydown", function (e) {
-    const row = e.target.closest("[data-server]");
+    const row = e.target.closest("[data-server], [data-archive]");
     if (!row || (e.key !== "Enter" && e.key !== " ")) return;
     e.preventDefault();
-    lastClickedTab = row;
-    openServer(row.dataset.server);
+    openRow(row);
 });
 
 /* a named head in the hotbar opens its player, by click, tap, Enter or Space */

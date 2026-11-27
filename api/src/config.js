@@ -1,4 +1,6 @@
-// every setting comes from the environment (see .env.example)
+// every setting comes from the environment (see the README)
+
+import path from "node:path";
 
 const env = process.env;
 
@@ -33,9 +35,18 @@ export const config = {
     // how long a login lasts: until the browser closes (at most this many hours), or with "remember" this many days
     sessionHours: Number(env.SESSION_HOURS) || 12,
     rememberDays: Number(env.REMEMBER_DAYS) || 30,
+    // a login also ends after this long without using the admin (with "remember": this many days)
+    idleMinutes: Number(env.IDLE_MINUTES) || 30,
+    rememberIdleDays: Number(env.REMEMBER_IDLE_DAYS) || 7,
 
+    // the API's own files (requests, whitelist, history); the only place it may write besides exportDir
     dataDir: env.DATA_DIR || "/data",
-    pluginDir: env.PLUGIN_DIR || "/plugin",
+    // where whitelist.txt is written for the Velocity plugin, which reads it read-only
+    exportDir: env.EXPORT_DIR || env.PLUGIN_DIR || "/plugin",
+    // what the plugin writes about everyone who joined; read-only here
+    seenFile: env.SEEN_FILE || path.join(env.PLUGIN_DIR || "/plugin", "seen.tsv"),
+    // the archived worlds, written by mc-backup --archive on the server; read-only here
+    archivedFile: env.ARCHIVED_FILE || "/archived/archived.txt",
 
     servers: parseServers(env.STATUS_SERVERS || "DS Network=velocity:25565"),
     statusCacheSeconds: Number(env.STATUS_CACHE_SECONDS) || 15,
