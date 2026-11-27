@@ -1,4 +1,4 @@
-// ntfy push for every new request, with Approve / Deny buttons that work from the notification.
+// ntfy push for every new request, with Approve / Deny / Block buttons that work from the notification.
 
 import crypto from "node:crypto";
 import { config } from "./config.js";
@@ -67,14 +67,15 @@ export async function notifyNewRequest(request, waiting = 1) {
     if (request.note) lines.push(`"${request.note}"`);
     if (waiting > 1) lines.push(`${waiting} requests are waiting for approval.`);
 
+    // ntfy shows three buttons at most; tapping the notification itself opens the admin page
     const actions = [];
     if (config.publicApiUrl) {
         actions.push(
             { action: "http", label: "Approve", url: signedActionUrl(request.id, "approve"), method: "POST", clear: true },
             { action: "http", label: "Deny", url: signedActionUrl(request.id, "deny"), method: "POST", clear: true },
+            { action: "http", label: "Block", url: signedActionUrl(request.id, "block"), method: "POST", clear: true },
         );
     }
-    if (adminUrl) actions.push({ action: "view", label: "Admin page", url: adminUrl });
 
     await publish({
         title: "Approval needed: whitelist request",
@@ -115,10 +116,11 @@ export async function notifySecurity(title, message) {
 
 export async function notifyDecision(request, via) {
     if (via !== "ntfy") return; // the admin page shows the result itself
+    const blocked = request.decidedVia === "blocked";
     await publish({
-        title: request.status === "approved" ? "Whitelisted" : "Request denied",
+        title: request.status === "approved" ? "Whitelisted" : blocked ? "Blacklisted" : "Request denied",
         message: `${request.name} (${request.edition === "java" ? "Java" : "Bedrock"})`,
-        tags: [request.status === "approved" ? "white_check_mark" : "x"],
+        tags: [request.status === "approved" ? "white_check_mark" : blocked ? "no_entry" : "x"],
         priority: 2,
     });
 }

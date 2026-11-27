@@ -253,6 +253,9 @@ services:
       dockerfile: api/Dockerfile
     # rebuild from the code on every mc-up; without this, up -d keeps running the image it built the first time
     pull_policy: build
+    # built here, not pulled from a registry: nothing for Diun (update notices) to compare against
+    labels:
+      diun.enable: "false"
     environment:
       # secrets come from sops: run it with mc-up (sops exec-env ~/nixos-config/secrets.yaml)
       ADMIN_TOKEN: "${WHITELIST_ADMIN_TOKEN:?whitelist admin token required, add it to secrets.yaml}"

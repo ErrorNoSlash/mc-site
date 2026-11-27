@@ -1,0 +1,36 @@
+# Tests the whitelist API on every push that touches it: the API is started for real and called like
+# the site, the admin page and the phone do (api/test). It runs in the same Node image the server
+# builds from (the FROM line in api/Dockerfile), so a Dependabot update of that image is tested too.
+# The host scripts in server/ get a syntax check.
+name: Test API
+
+on:
+  push:
+    paths: ["api/**", "admin/**", "site/scripts/**", "server/*.fish", ".github/workflows/api.yml"]
+  pull_request:
+    paths: ["api/**", "admin/**", "site/scripts/**", "server/*.fish", ".github/workflows/api.yml"]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read        # read the repo
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: API tests, in the server's Node image
+        run: |
+          image=$(grep -m1 '^FROM ' api/Dockerfile | cut -d' ' -f2)
+          echo "testing with $image"
+          docker run --rm -v "$PWD:/repo:ro" -w /repo "$image" sh -c 'node --test api/test/*.test.mjs'
+
+      - name: Host scripts parse
+        run: |
+          sudo apt-get install -y --no-install-recommends fish >/dev/null
+          for script in server/*.fish; do fish -n "$script"; echo "ok $script"; done

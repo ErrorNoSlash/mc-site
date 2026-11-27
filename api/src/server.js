@@ -379,10 +379,18 @@ route("GET", /^\/api\/requests\/lookup$/, async (req, res, url) => {
 });
 
 /* notification buttons: signed links, so they work without the admin token */
-route("POST", /^\/api\/act\/([\w-]+)\/(approve|deny)$/, async (req, res, url, [id, action]) => {
+route("POST", /^\/api\/act\/([\w-]+)\/(approve|deny|block)$/, async (req, res, url, [id, action]) => {
     rateLimit("act", clientIp(req), 30, 60);
     if (!verifyAction(id, action, url.searchParams.get("exp"), url.searchParams.get("sig"))) {
         throw new HttpError(403, "This link is invalid or has expired.");
+    }
+    if (action === "block") {
+        const request = store.findRequest(id);
+        if (!request) throw new HttpError(404, "No such request.");
+        store.blockPlayer({ edition: request.edition, name: request.name, uuid: request.uuid, reason: "", source: "ntfy" });
+        log(`blacklisted ${request.name} (${request.edition}) via ntfy`);
+        notifyDecision(store.findRequest(id), "ntfy").catch((error) => log("ntfy:", error.message));
+        return { ok: true, status: "blocked" };
     }
     const { request, alreadyDecided } = await decide(id, action === "approve", "ntfy");
     return { ok: true, status: request.status, alreadyDecided: Boolean(alreadyDecided) };
