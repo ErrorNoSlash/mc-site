@@ -1,5 +1,5 @@
 # Node 26 is the current LTS; pinned to one exact image, Dependabot proposes newer ones
-FROM node:26.12.1-alpine3.24
+FROM node:26.13.1-alpine3.24
 
 # built from the whole repo (compose: context ./mc-site), so the admin page and the site's styles and
 # scripts it uses come along: the API serves the admin page itself, only to the home network and VPN
