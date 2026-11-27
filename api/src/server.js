@@ -274,6 +274,9 @@ async function decide(id, approve, via) {
     if (via === "ntfy" && found.status !== "pending") {
         return { request: found, alreadyDecided: true };
     }
+    if (approve && store.findBlocked(found.edition, found.name, found.uuid)) {
+        throw new HttpError(409, `${found.name} is on the blacklist: take them off it first.`);
+    }
     const { request } = store.decideRequest(id, approve, via);
     log(`request ${id} ${request.status} via ${via}: ${request.name} (${request.edition})`);
     notifyDecision(request, via).catch((error) => log("ntfy:", error.message));
@@ -314,6 +317,9 @@ route("POST", /^\/api\/requests$/, async (req, res) => {
     rateLimit("request-try", ip, 20, 60 * 60);
     const player = await resolvePlayer(body.edition, body.name);
 
+    if (store.findBlocked(player.edition, player.name, player.uuid)) {
+        throw new HttpError(403, "This player can't request access to this server.", { status: "denied" });
+    }
     if (store.findPlayer(player.edition, player.name, player.uuid)) {
         return { status: "approved", name: player.name, edition: player.edition, message: "You're already whitelisted." };
     }
@@ -346,6 +352,8 @@ route("GET", /^\/api\/requests\/lookup$/, async (req, res, url) => {
         name = store.floodgateName(name);
     }
     if (!name || name.length > 17) throw new HttpError(400, "Give a name.");
+    // a blacklisted player just reads "declined": the blacklist itself isn't shown to anyone
+    if (store.findBlocked(edition, name)) return { status: "denied", name };
     if (store.isListedByName(edition, name)) return { status: "approved", name };
     const request = store.latestRequestFor(edition, name);
     return request ? publicRequest(request) : { status: "none", name };
@@ -405,10 +413,11 @@ route("GET", /^\/api\/admin\/overview$/, (req, res, url) => {
         ...entry,
         listed: listedUuids.has(entry.uuid)
             || (entry.edition === "bedrock" && listedKeys.has(store.playerKey("bedrock", entry.name))),
+        blocked: Boolean(store.findBlocked(entry.edition, entry.name, entry.uuid)),
     }));
     return {
         requests: [...store.allRequests()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 500),
-        whitelist: { ...whitelist, defaultMessage: store.DEFAULT_MESSAGE },
+        whitelist: { ...whitelist, defaultMessage: store.DEFAULT_MESSAGE, blockedMessage: store.BLOCKED_MESSAGE },
         seen,
         activity: store.getActivity().slice(-100).reverse(),
         ntfy: ntfyEnabled(),
@@ -443,6 +452,9 @@ route("POST", /^\/api\/admin\/players$/, async (req) => {
     } else {
         player = await resolvePlayer(body.edition, body.name);
     }
+    if (store.findBlocked(player.edition, player.name, player.uuid)) {
+        throw new HttpError(409, `${player.name} is on the blacklist: take them off it first.`);
+    }
     const added = store.addPlayer({ ...player, source: body.fromSeen ? "seen" : "admin" });
     log(`added ${added.name} (${added.edition}) by hand`);
     return { player: added };
@@ -452,6 +464,38 @@ route("DELETE", /^\/api\/admin\/players\/(.+)$/, (req, res, url, [key]) => {
     requireAdmin(req);
     if (!store.removePlayer(decodeURIComponent(key))) throw new HttpError(404, "Not on the whitelist.");
     log(`removed ${decodeURIComponent(key)}`);
+    return { ok: true };
+});
+
+/* blacklist someone: from a request, the seen list, the whitelist, or by name */
+route("POST", /^\/api\/admin\/blocked$/, async (req) => {
+    requireAdmin(req);
+    const body = await readJsonBody(req);
+    let player;
+    let source = "admin";
+    const request = body.requestId ? store.findRequest(String(body.requestId)) : null;
+    const listed = body.key ? store.getWhitelist().players.find((item) => item.key === body.key) : null;
+    if (request) {
+        player = { edition: request.edition, name: request.name, uuid: request.uuid };
+        source = "request";
+    } else if (listed) {
+        player = { edition: listed.edition, name: listed.name, uuid: listed.uuid };
+        source = "whitelist";
+    } else if (body.fromSeen && /^[0-9a-f-]{36}$/i.test(body.uuid || "") && /^[.\w]{1,16}$/.test(body.name || "")) {
+        player = { edition: body.edition === "bedrock" ? "bedrock" : "java", name: body.name, uuid: body.uuid.toLowerCase() };
+        source = "seen";
+    } else {
+        player = await resolvePlayer(body.edition, body.name);
+    }
+    const blocked = store.blockPlayer({ ...player, reason: cleanNote(body.reason).slice(0, 100), source });
+    log(`blacklisted ${blocked.name} (${blocked.edition})`);
+    return { player: blocked };
+});
+
+route("DELETE", /^\/api\/admin\/blocked\/(.+)$/, (req, res, url, [key]) => {
+    requireAdmin(req);
+    if (!store.unblockPlayer(decodeURIComponent(key))) throw new HttpError(404, "Not on the blacklist.");
+    log(`took ${decodeURIComponent(key)} off the blacklist`);
     return { ok: true };
 });
 

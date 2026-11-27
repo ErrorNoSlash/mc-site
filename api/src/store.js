@@ -17,6 +17,8 @@ const exportFile = () => path.join(config.exportDir, "whitelist.txt");
 export const DEFAULT_MESSAGE =
     "<red>You're not on the whitelist yet.</red><newline><newline>"
     + "<gray>Request access at</gray> <white>{site}</white>";
+// what a blacklisted player sees, whitelist on or off
+export const BLOCKED_MESSAGE = "<red>You can't join this server.</red>";
 
 // the history keeps the newest changes only, the login list the last few logins
 const ACTIVITY_LIMIT = 300;
@@ -26,7 +28,7 @@ const SEEN_MAX_BYTES = 5 * 1024 * 1024;
 const ARCHIVED_MAX_BYTES = 64 * 1024;
 
 let requests = [];
-let whitelist = { enforced: false, message: "", players: [] };
+let whitelist = { enforced: false, message: "", players: [], blocked: [] };
 let activity = [];
 let logins = [];
 let lastExportTime = 0;
@@ -62,6 +64,7 @@ export function load() {
         enforced: Boolean(stored.enforced),
         message: typeof stored.message === "string" ? stored.message : "",
         players: Array.isArray(stored.players) ? stored.players : [],
+        blocked: Array.isArray(stored.blocked) ? stored.blocked : [],
     };
     activity = readJson(activityFile(), null)?.activity || seedActivity();
     logins = readJson(loginsFile(), { logins: [] }).logins || [];
@@ -120,6 +123,9 @@ function exportWhitelist() {
         ...whitelist.players.map((player) => player.edition === "java"
             ? `java\t${player.uuid}\t${clean(player.name)}`
             : `bedrock\t${player.uuid || "-"}\t${clean(player.name)}`),
+        // the blacklist: turned away whether the whitelist is on or not (older plugins skip these lines)
+        `blockmessage\t${clean(BLOCKED_MESSAGE)}`,
+        ...whitelist.blocked.map((player) => `blocked\t${player.edition}\t${player.uuid || "-"}\t${clean(player.name)}`),
     ];
     // the plugin notices changes by modification time, so every export gets a strictly newer one
     lastExportTime = Math.max(Date.now(), lastExportTime + 1000);
@@ -263,6 +269,61 @@ export function removePlayer(key, isPartOfDecision = false) {
         }
     }
     if (changed) saveRequests();
+    return true;
+}
+
+/* ---------- blacklist ---------- */
+
+/* blacklisted: by uuid when it is known (a Java player who renames stays blocked), else by name */
+export function findBlocked(edition, name, uuid) {
+    const lower = String(name || "").toLowerCase();
+    // when both uuids are known only they count: someone who later takes the old name isn't blocked
+    return whitelist.blocked.find((player) => player.edition === edition
+        && (player.uuid && uuid ? player.uuid === uuid : player.name.toLowerCase() === lower));
+}
+
+/* off the whitelist, any waiting request declined, and turned away from now on */
+export function blockPlayer({ edition, name, uuid, reason, source }) {
+    const existing = findBlocked(edition, name, uuid);
+    if (existing) return existing;
+
+    const listed = whitelist.players.find((player) => player.edition === edition
+        && ((uuid && player.uuid === uuid) || player.name.toLowerCase() === name.toLowerCase()));
+    if (listed) whitelist.players = whitelist.players.filter((player) => player !== listed);
+
+    let requestsChanged = false;
+    for (const request of requests) {
+        if (request.edition === edition && request.name.toLowerCase() === name.toLowerCase()
+            && (request.status === "pending" || request.status === "approved")) {
+            request.status = "denied";
+            request.decidedAt = new Date().toISOString();
+            request.decidedVia = "blocked";
+            requestsChanged = true;
+        }
+    }
+    if (requestsChanged) saveRequests();
+
+    const player = {
+        key: uuid ? `${edition}:${uuid}` : `${edition}:name:${name.toLowerCase()}`,
+        edition,
+        name,
+        uuid: uuid || null,
+        reason: reason || "",
+        blockedAt: new Date().toISOString(),
+        source,
+    };
+    whitelist.blocked.push(player);
+    saveWhitelist();
+    record("blocked", { edition, name, reason: player.reason || undefined });
+    return player;
+}
+
+export function unblockPlayer(key) {
+    const player = whitelist.blocked.find((item) => item.key === key);
+    if (!player) return false;
+    whitelist.blocked = whitelist.blocked.filter((item) => item !== player);
+    saveWhitelist();
+    record("unblocked", { edition: player.edition, name: player.name });
     return true;
 }
 

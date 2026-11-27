@@ -152,6 +152,8 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | `DELETE` | `/api/admin/requests/:id`                   | session / token  |
 | `POST`   | `/api/admin/players` `{edition, name}`      | session / token  |
 | `DELETE` | `/api/admin/players/:key`                   | session / token  |
+| `POST`   | `/api/admin/blocked` (a request, a player, or by name) | session / token |
+| `DELETE` | `/api/admin/blocked/:key`                   | session / token  |
 | `PUT`    | `/api/admin/settings` `{enforced, message}` | session / token  |
 | `POST`   | `/api/admin/test-notification`              | session / token  |
 
@@ -185,6 +187,10 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 Data lives in `/data/minecraft/whitelist/` (`requests.json`, `whitelist.json`, `logins.json`, and `export/whitelist.txt` for the plugin). `mc-backup` ([`server/backup.fish`](server/backup.fish)) backs it up with the worlds: `mc-backup` for everything, `mc-backup survival anarchy` for some, `--list`, `--keep N`, `--to DIR`, `--restore NAME`. A world you no longer play: `mc-backup --archive NAME` packs it away for good (kept in `<backups>/archive`, never thinned out), stops its server and can free its space; `--unarchive NAME` brings it back, then `mc-up`. Nothing else changes: the script lists the world in `/data/minecraft/archived/archived.txt` (the proxy drops it from its server list within seconds, the status and the site show it under archived worlds with its date and size) and sets `MC_<NAME>=0` in the stack's `.env`, so `mc-up` leaves it off. A new world needs `deploy: replicas: ${MC_<NAME>:-1}` in its service, like the others.
 
 A server you only want off for a while: `mc-off anarchy back in december` ([`server/power.fish`](server/power.fish)) stops it, keeps `mc-up` from starting it, and the site shows it as **OFF** with that reason and the date, instead of **DOWN** (which stays for a server that should be up but isn't answering). `mc-on anarchy`, then `mc-up`, turns it back on; `mc-off` alone lists what is off. Nothing happens to the world.
+
+**Blacklist.** On the admin page, **block** (on a request, a player who joined, or in a player's popup) declines them, takes them off the whitelist and turns them away from then on, whitelist on or off; online, they're kicked. The **blacklist** tab beside the whitelist shows who is on it (with your reason, which only you see) and takes them off again. A blacklisted player can't send a request; checking their request just shows "declined".
+
+**Logs.** `mc-logs` ([`server/logs.fish`](server/logs.fish)) shows the last lines of the proxy, the API and every server; `mc-logs survival` follows one live (or `proxy`, `api`), `mc-logs -f` follows them all at once, `-g word` keeps only lines with that word, `-n 500` goes further back.
 
 </details>
 

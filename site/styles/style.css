@@ -1608,6 +1608,24 @@ body.popup-open .sheet :is(*, *::before, *::after) {
     }
 }
 
+/* admin: the whitelist / blacklist switch in the list's header line */
+.list-tabs {
+    display: inline-flex;
+    flex: none;
+    gap: 0.375rem;
+
+    /* the list that is showing */
+    .pill[aria-pressed="true"] {
+        background: var(--foreground);
+        color: var(--background);
+    }
+
+    /* the count beside the name (a flex item, so the space before it needs a margin) */
+    .pill span {
+        margin-left: 0.4em;
+    }
+}
+
 /* admin: one titled block */
 .admin-block {
     display: flex;
@@ -2575,7 +2593,7 @@ body.cursor-on-link {
         }
 
         /* the lists themselves scroll */
-        :is(#listed-list, #seen-list, .request-cards, .history-list) {
+        :is(#listed-list, #blocked-list, #seen-list, .request-cards, .history-list) {
             min-height: 0;
             overflow-y: auto;
             overscroll-behavior: contain;
@@ -2583,7 +2601,7 @@ body.cursor-on-link {
             scrollbar-color: var(--foreground) transparent;
         }
 
-        #listed-list {
+        :is(#listed-list, #blocked-list) {
             flex: 1 1 0;
         }
 

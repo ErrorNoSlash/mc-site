@@ -13,6 +13,10 @@ const sheet = document.querySelector(".sheet");
 const adminView = document.querySelector("#admin-view");
 const logoutButton = document.querySelector("#logout");
 const securityLine = document.querySelector("#security-line");
+const addForm = document.querySelector("#add-form");
+const listTabs = document.querySelectorAll(".list-tabs [data-list]");
+// which list the left block shows: "whitelist" or "blacklist"
+let shownList = "whitelist";
 const notice = document.querySelector("#notice");
 const enforceButton = document.querySelector("#enforce");
 const messageForm = document.querySelector("#message-form");
@@ -186,7 +190,43 @@ function pendingRow(request) {
             h("button", {
                 class: "pill big", type: "button",
                 onclick: function () { act(adminApi("/api/admin/requests/" + request.id + "/deny", { method: "POST" }), request.name + " denied"); }
-            }, "deny")
+            }, "deny"),
+            h("button", {
+                class: "pill big", type: "button", title: "Deny and blacklist",
+                onclick: function () { block(request.name, { requestId: request.id }); }
+            }, "block")
+        )
+    );
+}
+
+/* blacklisting: asks first, then the API declines their request, takes them off the whitelist and
+   turns them away from now on, whitelist on or off */
+async function block(name, body) {
+    const sure = await askConfirm("Blacklist " + name + "?",
+        "They come off the whitelist, any request is declined, and they can't join or ask again (whitelist on or off). If they're online they get kicked.",
+        "Blacklist");
+    if (!sure) return false;
+    return act(adminApi("/api/admin/blocked", { method: "POST", body: body }), name + " is blacklisted");
+}
+
+function unblock(player) {
+    return act(adminApi("/api/admin/blocked/" + encodeURIComponent(player.key), { method: "DELETE" }), player.name + " is off the blacklist");
+}
+
+/*a blacklisted player: when, why, and the way back*/
+function blockedRow(player) {
+    const details = ["blacklisted " + timeAgo(player.blockedAt)];
+    if (player.reason) details.push(player.reason);
+    return h("div", { class: "admin-row" },
+        who(player,
+            h("b", null, player.name), editionTag(player.edition),
+            h("small", null, details.join(" · "))
+        ),
+        h("div", { class: "actions" },
+            h("button", {
+                class: "pill small", type: "button", title: "Take " + player.name + " off the blacklist",
+                onclick: function () { unblock(player); }
+            }, "unblock")
         )
     );
 }
@@ -242,7 +282,11 @@ function seenRow(entry) {
             h("button", {
                 class: "pill small", type: "button",
                 onclick: function () { act(addSeen(entry), entry.name + " whitelisted"); }
-            }, "add")
+            }, "add"),
+            h("button", {
+                class: "pill small", type: "button", title: "Blacklist " + entry.name,
+                onclick: function () { block(entry.name, { fromSeen: true, edition: entry.edition, name: entry.name, uuid: entry.uuid }); }
+            }, "block")
         )
     );
 }
@@ -254,8 +298,10 @@ const historyText = {
     "removed": function (entry) { return [h("b", null, entry.name), " removed"]; },
     "requested": function (entry) { return [h("b", null, entry.name), " asked to join"]; },
     "approved": function (entry) { return [h("b", null, entry.name), " approved ", h("small", null, entry.via === "ntfy" ? "from a notification" : "")]; },
-    "denied": function (entry) { return [h("b", null, entry.name), " denied ", h("small", null, entry.via === "removed" ? "taken off the list" : entry.via === "ntfy" ? "from a notification" : "")]; },
+    "denied": function (entry) { return [h("b", null, entry.name), " denied ", h("small", null, entry.via === "removed" ? "taken off the list" : entry.via === "blocked" ? "blacklisted" : entry.via === "ntfy" ? "from a notification" : "")]; },
     "forgotten": function (entry) { return [h("b", null, entry.name), "'s request forgotten"]; },
+    "blocked": function (entry) { return [h("b", null, entry.name), " blacklisted ", h("small", null, entry.reason || "")]; },
+    "unblocked": function (entry) { return [h("b", null, entry.name), " taken off the blacklist"]; },
     "turned on": function () { return ["whitelist turned ", h("b", null, "ON")]; },
     "turned off": function () { return ["whitelist turned ", h("b", null, "OFF")]; },
     "message changed": function () { return ["kick message changed"]; },
@@ -301,6 +347,7 @@ function playerInfo(edition, name, uuid) {
     }
     return {
         listed: overview.whitelist.players.find(isThem),
+        blocked: (overview.whitelist.blocked || []).find(isThem),
         seen: overview.seen.find(isThem),
         // newest first, so this is their latest request
         request: overview.requests.find(isThem),
@@ -320,13 +367,15 @@ function showPlayer(edition, name, uuid) {
     const listed = info.listed;
     const seen = info.seen;
     const request = info.request;
+    const blocked = info.blocked;
     uuid = uuid || (listed && listed.uuid) || (seen && edition === "java" ? seen.uuid : null);
 
     playerPanel.querySelector("#panel-player-title").textContent = name;
     const card = playerCard(name, edition === "java" ? uuid : null, [
         ["edition", edition === "java" ? "Java" : "Bedrock"],
         uuid ? ["uuid", h("button", { class: "copy-text", type: "button", "data-copy": uuid, title: "Copy" }, uuid)] : null,
-        ["whitelist", listed ? "listed " + timeAgo(listed.addedAt) + " · " + (listedHow[String(listed.source).split(" ")[0]] || listed.source) : "not listed"],
+        ["whitelist", blocked ? "blacklisted " + timeAgo(blocked.blockedAt) + (blocked.reason ? " · " + blocked.reason : "")
+            : listed ? "listed " + timeAgo(listed.addedAt) + " · " + (listedHow[String(listed.source).split(" ")[0]] || listed.source) : "not listed"],
         ["first seen", seen ? dateText(seen.firstSeen) : "hasn't joined yet"],
         seen ? ["last seen", timeAgo(seen.lastSeen) + (seen.turnedAway ? " · turned away" : "")] : null,
         seen ? ["logins", String(seen.logins)] : null,
@@ -342,7 +391,15 @@ function showPlayer(edition, name, uuid) {
 
     // what can be done with them, depending on where they stand
     let action = null;
-    if (listed) {
+    if (blocked) {
+        action = h("button", {
+            class: "mc-button", type: "button",
+            onclick: function () {
+                closePopup();
+                unblock(blocked);
+            }
+        }, "Unblock");
+    } else if (listed) {
         action = h("button", {
             class: "mc-button", type: "button",
             onclick: async function () {
@@ -371,6 +428,16 @@ function showPlayer(edition, name, uuid) {
     const buttons = [];
     if (edition === "java") buttons.push(h("a", { class: "mc-button", href: "https://namemc.com/profile/" + encodeURIComponent(uuid || name), target: "_blank", rel: "noopener" }, "NameMC ↗"));
     if (action) buttons.push(action);
+    if (!blocked) {
+        buttons.push(h("button", {
+            class: "mc-button", type: "button",
+            onclick: function () {
+                closePopup();
+                block(name, listed ? { key: listed.key } : request ? { requestId: request.id }
+                    : seen ? { fromSeen: true, edition: edition, name: seen.name, uuid: seen.uuid } : { edition: edition, name: name });
+            }
+        }, "Blacklist"));
+    }
     playerPanel.querySelector("#panel-player-buttons").replaceChildren(...buttons);
 
     openPopup(playerPanel);
@@ -456,7 +523,9 @@ function render(data) {
     renderedKey = key;
     overview = data;
     const pending = data.requests.filter(function (request) { return request.status === "pending"; });
-    const unlisted = data.seen.filter(function (entry) { return !entry.listed; });
+    // the blacklisted don't count as "seen, not listed": that list is for people you might still add
+    const unlisted = data.seen.filter(function (entry) { return !entry.listed && !entry.blocked; });
+    const blockedPlayers = [...(data.whitelist.blocked || [])].sort(function (a, b) { return b.blockedAt.localeCompare(a.blockedAt); });
     const players = [...data.whitelist.players].sort(function (a, b) { return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }); });
 
     document.querySelector("#stat-pending").textContent = pending.length;
@@ -475,8 +544,10 @@ function render(data) {
     document.querySelector("#ntfy-test").hidden = !data.ntfy;
     document.querySelector("#pending-list").replaceChildren(...pending.map(pendingRow));
     document.querySelector("#pending-empty").hidden = pending.length > 0;
-    document.querySelector("#listed-count").textContent = players.length + (players.length === 1 ? " player" : " players");
+    document.querySelector("#listed-count").textContent = players.length;
+    document.querySelector("#blocked-count").textContent = blockedPlayers.length;
     fill("listed-list", players.map(listedRow), "nobody yet. add yourself first!");
+    fill("blocked-list", blockedPlayers.map(blockedRow), "nobody is blacklisted.");
     fill("seen-list", unlisted.map(seenRow), data.seen.length ? "everyone who joined is listed." : "nobody has joined since the plugin was installed.");
     document.querySelector("#add-all-seen").hidden = unlisted.length < 2;
     fill("history-list", historyRows(data.activity || []), "nothing has changed yet.");
@@ -591,16 +662,36 @@ enforceButton.addEventListener("click", async function () {
     act(adminApi("/api/admin/settings", { method: "PUT", body: { enforced: turnOn } }), "whitelist " + (turnOn ? "on" : "off"));
 });
 
-document.querySelector("#add-form").addEventListener("submit", function (e) {
+/* the form adds to the list that is showing: the whitelist, or the blacklist (with an optional why) */
+addForm.addEventListener("submit", async function (e) {
     e.preventDefault();
-    const form = e.target;
-    const name = form.elements.name.value.trim();
-    act(adminApi("/api/admin/players", { method: "POST", body: { edition: form.elements.edition.value, name: name } }), name + " added")
-        .then(function (ok) { if (ok) form.elements.name.value = ""; });
+    const name = addForm.elements.name.value.trim();
+    const edition = addForm.elements.edition.value;
+    const ok = shownList === "blacklist"
+        ? await block(name, { edition: edition, name: name, reason: addForm.elements.reason.value.trim() })
+        : await act(adminApi("/api/admin/players", { method: "POST", body: { edition: edition, name: name } }), name + " added");
+    if (ok) {
+        addForm.elements.name.value = "";
+        addForm.elements.reason.value = "";
+    }
+});
+
+/* whitelist / blacklist: the tabs in the list's header line */
+listTabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+        shownList = tab.dataset.list;
+        const isBlacklist = shownList === "blacklist";
+        listTabs.forEach(function (other) { other.setAttribute("aria-pressed", String(other === tab)); });
+        document.querySelector("#listed-head").textContent = "dias@mc:~$ /" + shownList + " list";
+        document.querySelector("#listed-list").hidden = isBlacklist;
+        document.querySelector("#blocked-list").hidden = !isBlacklist;
+        addForm.elements.reason.hidden = !isBlacklist;
+        document.querySelector("#add-button").textContent = isBlacklist ? "block" : "add";
+    });
 });
 
 document.querySelector("#add-all-seen").addEventListener("click", async function () {
-    const unlisted = overview.seen.filter(function (entry) { return !entry.listed; });
+    const unlisted = overview.seen.filter(function (entry) { return !entry.listed && !entry.blocked; });
     if (!await askConfirm("Add all " + unlisted.length + " players?", "Everyone who joined before but isn't listed goes on the whitelist.", "Add all")) return;
     act(Promise.all(unlisted.map(addSeen)), unlisted.length + " players whitelisted");
 });

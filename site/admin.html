@@ -132,17 +132,27 @@
             </section>
 
             <div class="row admin-grid grow">
+                <!-- the whitelist, or with the tab beside it the blacklist (admin.js): the form above
+                     the list adds to whichever one is showing -->
                 <section class="admin-block" aria-labelledby="listed-head" data-page="players">
-                    <div class="block-head"><span id="listed-head">dias@mc:~$ /whitelist list</span><span class="caption" id="listed-count"></span></div>
+                    <div class="block-head">
+                        <span id="listed-head">dias@mc:~$ /whitelist list</span>
+                        <span class="list-tabs" role="group" aria-label="Which list">
+                            <button class="pill small" type="button" data-list="whitelist" aria-pressed="true">whitelist <span id="listed-count"></span></button>
+                            <button class="pill small" type="button" data-list="blacklist" aria-pressed="false">blacklist <span id="blocked-count"></span></button>
+                        </span>
+                    </div>
                     <form class="add-form" id="add-form">
                         <select name="edition" aria-label="Edition">
                             <option value="java">java</option>
                             <option value="bedrock">bedrock</option>
                         </select>
                         <input type="text" name="name" placeholder="name or gamertag" aria-label="Name or gamertag" autocomplete="off" spellcheck="false" required>
-                        <button class="pill is-main" type="submit">add</button>
+                        <input type="text" name="reason" placeholder="why (only you see this)" aria-label="Why, only you see this" autocomplete="off" maxlength="100" hidden>
+                        <button class="pill is-main" type="submit" id="add-button">add</button>
                     </form>
                     <div id="listed-list"></div>
+                    <div id="blocked-list" hidden></div>
                 </section>
 
                 <!-- the right column: who joined without being listed, then everything that changed -->

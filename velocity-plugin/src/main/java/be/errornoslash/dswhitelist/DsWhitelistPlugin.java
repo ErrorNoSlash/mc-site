@@ -134,12 +134,16 @@ public final class DsWhitelistPlugin {
 
         Player player = event.getPlayer();
         Whitelist current = whitelist;
+        boolean blocked = current.blocks(player.getUniqueId(), player.getUsername());
         boolean listed = current.allows(player.getUniqueId(), player.getUsername());
-        boolean turnedAway = current.enforced() && !listed;
+        boolean turnedAway = blocked || (current.enforced() && !listed);
 
         seenLog.record(player.getUniqueId(), player.getUsername(), turnedAway);
 
-        if (turnedAway) {
+        if (blocked) {
+            event.setResult(ResultedEvent.ComponentResult.denied(message(current.blockMessage(), player)));
+            logger.info("Turned away " + player.getUsername() + " (" + player.getUniqueId() + "): blacklisted");
+        } else if (turnedAway) {
             event.setResult(ResultedEvent.ComponentResult.denied(kickMessage(current, player)));
             logger.info("Turned away " + player.getUsername() + " (" + player.getUniqueId() + "): not whitelisted");
         }
@@ -181,7 +185,8 @@ public final class DsWhitelistPlugin {
             loadedModified = modified;
             warnedMissing = false;
             logger.info("Whitelist loaded: " + loaded.size() + " players, "
-                    + (loaded.enforced() ? "enforced" : "NOT enforced (everyone can join)"));
+                    + (loaded.enforced() ? "enforced" : "NOT enforced (everyone can join)")
+                    + (loaded.blockedSize() > 0 ? ", " + loaded.blockedSize() + " blacklisted" : ""));
             return true;
         } catch (IOException | RuntimeException exception) {
             // keep the last good list rather than letting everyone in or locking everyone out
@@ -191,13 +196,14 @@ public final class DsWhitelistPlugin {
         }
     }
 
+    /* After a change: blacklisted players go always, players taken off the whitelist only while it is on */
     private void kickRemovedPlayers() {
         Whitelist current = whitelist;
-        if (!current.enforced()) {
-            return;
-        }
         for (Player player : proxy.getAllPlayers()) {
-            if (!current.allows(player.getUniqueId(), player.getUsername())) {
+            if (current.blocks(player.getUniqueId(), player.getUsername())) {
+                player.disconnect(message(current.blockMessage(), player));
+                logger.info("Kicked " + player.getUsername() + ": blacklisted");
+            } else if (current.enforced() && !current.allows(player.getUniqueId(), player.getUsername())) {
                 player.disconnect(kickMessage(current, player));
                 logger.info("Kicked " + player.getUsername() + ": removed from the whitelist");
             }
@@ -253,8 +259,13 @@ public final class DsWhitelistPlugin {
     }
 
     private Component kickMessage(Whitelist current, Player player) {
-        // the name is escaped, so a name can never add tags of its own
-        String text = current.message().replace("{name}", MINI_MESSAGE.escapeTags(player.getUsername()));
+        return message(current.message(), player);
+    }
+
+    /* A message from the file, with {name} filled in. The name is escaped, so a name can never add
+       tags of its own; markup that doesn't parse falls back to the default message. */
+    private Component message(String template, Player player) {
+        String text = template.replace("{name}", MINI_MESSAGE.escapeTags(player.getUsername()));
         try {
             return MINI_MESSAGE.deserialize(text);
         } catch (RuntimeException badMarkup) {
