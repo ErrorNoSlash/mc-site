@@ -60,7 +60,7 @@ async function publish(message) {
 }
 
 export async function notifyNewRequest(request, waiting = 1) {
-    const adminUrl = config.siteUrl ? `${config.siteUrl}/admin.html` : undefined;
+    const adminUrl = config.publicApiUrl ? `${config.publicApiUrl}/admin/` : undefined;
     const edition = request.edition === "java" ? "Java" : "Bedrock";
     const lines = [`${request.name} (${edition}) wants to join.`];
     if (request.edition === "bedrock" && request.enteredName !== request.name) lines.push(`Gamertag: ${request.enteredName}`);
@@ -89,7 +89,7 @@ export async function notifyNewRequest(request, waiting = 1) {
 /* the admin page's "test" button: proves the whole path to your phone works */
 export async function notifyTest() {
     if (!ntfyEnabled()) throw new Error("ntfy is off: set NTFY_TOPIC (and NTFY_URL / NTFY_TOKEN) for the API");
-    const adminUrl = config.siteUrl ? `${config.siteUrl}/admin.html` : undefined;
+    const adminUrl = config.publicApiUrl ? `${config.publicApiUrl}/admin/` : undefined;
     await publish({
         title: "Whitelist notifications work",
         message: "This is a test from the admin page. New whitelist requests will show up like this, with Approve and Deny buttons.",
@@ -103,7 +103,7 @@ export async function notifyTest() {
 /* security: a login on the admin page, or someone guessing tokens. you hear about it straight away,
    so a login that wasn't you stands out */
 export async function notifySecurity(title, message) {
-    const adminUrl = config.siteUrl ? `${config.siteUrl}/admin.html` : undefined;
+    const adminUrl = config.publicApiUrl ? `${config.publicApiUrl}/admin/` : undefined;
     await publish({
         title,
         message,

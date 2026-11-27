@@ -2,6 +2,9 @@
   on phones and tablets it is split into three pages, picked with the tabs under the menu.
   logging in swaps the token for a session cookie the page itself can't read; the token is never kept*/
 
+// the page is served by the API itself (/admin/ on mc-api), so every call goes to where it came from
+site.apiBase = location.origin;
+
 // where older versions of this page kept the token: cleared on every visit
 const oldTokenKey = "whitelistAdminToken";
 
@@ -61,9 +64,23 @@ function loginProblem(error) {
     return error.message;
 }
 
+/*the login form asks for the authenticator code only when 2FA is set up on the API*/
+async function askLoginOptions() {
+    let needsCode = true;
+    try {
+        needsCode = (await adminApi("/api/admin/login")).code;
+    } catch (error) {
+        // can't tell: keep the field, the API ignores a code it doesn't need
+    }
+    document.querySelector("#login-code").hidden = !needsCode;
+    document.querySelector("#login-code-text").hidden = !needsCode;
+    loginForm.elements.code.required = needsCode;
+}
+
 function showLogin(message) {
     adminView.hidden = true;
     loginScreen.hidden = false;
+    askLoginOptions();
     logoutButton.hidden = true;
     securityLine.hidden = true;
     if (message) {
@@ -566,7 +583,8 @@ function renderSecurity(security) {
     const before = security.previousLogin;
     const devices = security.sessions + (security.sessions === 1 ? " login open" : " logins open");
     document.querySelector("#security-text").textContent =
-        (before ? "login before this: " + timeAgo(before.at) + " from " + before.from + " (" + before.ip + ")" : "first login") + " · " + devices;
+        (before ? "login before this: " + timeAgo(before.at) + " from " + before.from + " (" + before.ip + ")" : "first login") + " · " + devices
+        + (security.twoFactor ? " · 2FA on" : " · 2FA off");
 }
 
 /*loads everything; without a valid session cookie that is the login screen. the page's own
@@ -598,15 +616,17 @@ loginForm.addEventListener("submit", async function (e) {
     e.preventDefault();
     const token = loginForm.elements.token.value.trim();
     const remember = loginForm.elements.remember.checked;
-    // the token leaves the field straight away; only the cookie the API answers with stays
+    const code = loginForm.elements.code.value.trim();
+    // the token and code leave the fields straight away; only the cookie the API answers with stays
     loginForm.elements.token.value = "";
+    loginForm.elements.code.value = "";
     loginOutput.dataset.tone = "wait";
     loginOutput.replaceChildren(h("span", null, "> checking..."));
     try {
-        await adminApi("/api/admin/login", { method: "POST", body: { token: token, remember: remember } });
+        await adminApi("/api/admin/login", { method: "POST", body: { token: token, code: code, remember: remember } });
     } catch (error) {
         loginOutput.dataset.tone = "error";
-        loginOutput.replaceChildren(h("span", null, "> " + (error.status === 401 ? "that token isn't right" : loginProblem(error))));
+        loginOutput.replaceChildren(h("span", null, "> " + (error.status === 401 ? error.message.toLowerCase().replace(/\.$/, "") : loginProblem(error))));
         return;
     }
     loginOutput.replaceChildren();

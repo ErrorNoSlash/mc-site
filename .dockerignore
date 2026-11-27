@@ -1,0 +1,9 @@
+# the API image is built from the whole repo (server/docker-compose.yml) but only needs api/, admin/
+# and part of site/: everything else stays out of the build
+.git
+.github
+**/node_modules
+velocity-plugin
+server
+*.md
+**/.env

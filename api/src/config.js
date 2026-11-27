@@ -25,6 +25,13 @@ function parseServers(value) {
 export const config = {
     port: Number(env.PORT) || 8080,
     adminToken: env.ADMIN_TOKEN || "",
+    // the second login step: the secret of the authenticator app (base32, from admin-2fa.fish);
+    // without it the admin logs in with the token alone
+    adminTotpSecret: (env.ADMIN_TOTP_SECRET || "").trim(),
+    // where the admin page's files are: <PAGE_DIR>/admin and the site's styles and scripts in <PAGE_DIR>/site
+    pageDir: env.PAGE_DIR || "/app",
+    // the admin page's own address; by default https:// + the host it was asked for
+    adminOrigin: trimSlash(env.ADMIN_ORIGIN),
     allowedOrigins: list(env.ALLOWED_ORIGINS),
     siteUrl: trimSlash(env.SITE_URL),
     publicApiUrl: trimSlash(env.PUBLIC_API_URL),
@@ -81,6 +88,9 @@ export function checkConfig() {
         if (!/^[\d.]+\/\d{1,2}$|^[\da-f:]+\/\d{1,3}$/i.test(network)) {
             problems.push(`ADMIN_NETWORKS: "${network}" is not a network like 10.0.0.0/24`);
         }
+    }
+    if (config.adminTotpSecret && !/^[A-Z2-7=\s-]{16,}$/i.test(config.adminTotpSecret)) {
+        problems.push("ADMIN_TOTP_SECRET must be base32 (run server/admin-2fa.fish to make one)");
     }
     if (config.servers.length === 0) {
         problems.push("STATUS_SERVERS must list at least the proxy, e.g. DS Network=velocity:25565");

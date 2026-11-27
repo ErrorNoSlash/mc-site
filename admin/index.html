@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <!-- security: only load scripts, styles, fonts and pictures from this site and the few places named here,
          always over https -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://mc-heads.net; connect-src 'self' https://mc-api.errornoslash.be; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://mc-heads.net; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>DS Network · admin</title>
     <meta name="robots" content="noindex, nofollow">
@@ -31,7 +31,7 @@
     <script src="scripts/common.js" defer></script>
     <script src="scripts/cursor.js" defer></script>
     <script src="scripts/panorama.js" defer></script>
-    <script src="scripts/admin.js" defer></script>
+    <script src="admin.js" defer></script>
 </head>
 
 <body class="admin-page">
@@ -42,10 +42,10 @@
     <main class="sheet">
 
         <div class="row nav">
-            <a class="cell nav-logo" href="index.html" aria-label="Back to the server page">ds/</a>
+            <a class="cell nav-logo" href="https://join.errornoslash.be/" aria-label="Back to the server page">ds/</a>
             <div class="cell nav-prompt">dias@mc:~$ /op dias<span class="caret"></span></div>
             <nav class="cell nav-tabs" aria-label="Admin">
-                <a class="pill" href="index.html">site</a>
+                <a class="pill" href="https://join.errornoslash.be/">site</a>
                 <button class="pill" type="button" id="logout" hidden>log out</button>
             </nav>
         </div>
@@ -76,16 +76,21 @@
                         <h2 id="login-heading">Admin login</h2>
                     </div>
                     <div class="panel-body">
-                        <p class="login-text">Paste your admin token (<b>WHITELIST_ADMIN_TOKEN</b> in secrets.yaml).</p>
+                        <p class="login-text">Paste your admin token (<b>WHITELIST_ADMIN_TOKEN</b> in secrets.yaml)<span id="login-code-text">, then the 6-digit code from your authenticator app</span>.</p>
                         <label class="field">
                             <span class="caption">admin token</span>
                             <input type="password" name="token" autocomplete="current-password" required>
+                        </label>
+                        <!-- the second step, when 2FA is set up (admin-2fa.fish); admin.js asks the API -->
+                        <label class="field" id="login-code" hidden>
+                            <span class="caption">code from your authenticator app</span>
+                            <input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" spellcheck="false">
                         </label>
                         <label class="check"><input type="checkbox" name="remember"> remember on this device</label>
                         <output class="terminal-output" id="login-output" aria-live="polite"></output>
                     </div>
                     <div class="panel-buttons">
-                        <a class="mc-button" href="index.html">Back to site</a>
+                        <a class="mc-button" href="https://join.errornoslash.be/">Back to site</a>
                         <button class="mc-button" type="submit">Log in</button>
                     </div>
                 </form>

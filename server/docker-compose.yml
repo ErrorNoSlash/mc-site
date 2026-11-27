@@ -247,12 +247,18 @@ services:
   # status + whitelist requests for the website (mc-site repo, api/ folder)
   whitelist-api:
     container_name: "Whitelist-API"
-    build: ./mc-site/api
+    # the whole repo is the build context: the image also carries the admin page (see api/Dockerfile)
+    build:
+      context: ./mc-site
+      dockerfile: api/Dockerfile
     # rebuild from the code on every mc-up; without this, up -d keeps running the image it built the first time
     pull_policy: build
     environment:
       # secrets come from sops: run it with mc-up (sops exec-env ~/nixos-config/secrets.yaml)
       ADMIN_TOKEN: "${WHITELIST_ADMIN_TOKEN:?whitelist admin token required, add it to secrets.yaml}"
+      # the second login step: the authenticator app's secret (server/admin-2fa.fish puts it in secrets.yaml);
+      # empty = the token alone
+      ADMIN_TOTP_SECRET: "${ADMIN_TOTP_SECRET:-}"
       NTFY_TOKEN: "${NTFY_TOKEN:-}"
       SITE_URL: "https://join.errornoslash.be"
       PUBLIC_API_URL: "https://mc-api.errornoslash.be"

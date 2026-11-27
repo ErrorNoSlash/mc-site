@@ -4,6 +4,9 @@
 import http from "node:http";
 import net from "node:net";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { base32Decode, checkCode, useCode } from "./totp.js";
 import { config, checkConfig } from "./config.js";
 import * as store from "./store.js";
 import { getStatus } from "./status.js";
@@ -210,13 +213,26 @@ function activeSessions() {
     return [...sessions.values()].filter((session) => session.expires > now && session.idleUntil > now).length;
 }
 
+/* the admin page lives on the API itself (/admin/), so its calls are same-origin: a browser call to an
+   admin route from anywhere else (the public site included) is refused. a browser always says where a
+   call comes from (Origin, Sec-Fetch-Site); curl and scripts send neither and use the token instead */
+function adminOrigin(req) {
+    return config.adminOrigin || `https://${req.headers.host}`;
+}
+
+function fromAdminPage(req) {
+    const origin = req.headers.origin;
+    const site = req.headers["sec-fetch-site"];
+    if (site && site !== "same-origin" && site !== "none") return false;
+    return !origin || origin === adminOrigin(req);
+}
+
 /* every admin route: a session cookie, or the token as "Authorization: Bearer" (for scripts and curl).
-   a change made with the cookie must come from the site itself (Origin), on top of SameSite */
+   a change made with the cookie must come from the admin page itself (Origin), on top of SameSite */
 function requireAdmin(req, isAuto = false) {
     const ip = clientIp(req);
     if (hasSession(req, isAuto)) {
-        const origin = req.headers.origin;
-        if (req.method !== "GET" && !config.allowedOrigins.includes(origin)) {
+        if (!fromAdminPage(req) || (req.method !== "GET" && req.headers.origin !== adminOrigin(req))) {
             throw new HttpError(403, "Changes only work from the admin page.");
         }
         return;
@@ -371,25 +387,34 @@ route("POST", /^\/api\/act\/([\w-]+)\/(approve|deny)$/, async (req, res, url, [i
 
 /* ---------- admin ---------- */
 
+/* what the login form asks for: the token, and the authenticator code when 2FA is set up */
+route("GET", /^\/api\/admin\/login$/, () => ({ code: Boolean(totpSecret) }));
+
 route("POST", /^\/api\/admin\/login$/, async (req, res) => {
     const ip = clientIp(req);
+    if (req.headers.origin !== adminOrigin(req)) throw new HttpError(403, "Log in from the admin page.");
     checkLockouts(ip);
     const body = await readJsonBody(req);
-    if (!tokenMatches(String(body.token || "").trim())) {
+    // both are checked every time and a miss doesn't say which was wrong
+    const tokenOk = tokenMatches(String(body.token || "").trim());
+    const codeStep = totpSecret ? checkCode(totpSecret, String(body.code || "").trim()) : 0;
+    if (!tokenOk || codeStep < 0) {
         wrongToken(ip);
-        throw new HttpError(401, "Wrong admin token.");
+        throw new HttpError(401, totpSecret ? "Wrong token or code." : "Wrong admin token.");
     }
+    if (totpSecret) useCode(codeStep);
     const remember = body.remember === true;
     startSession(res, remember);
     store.recordLogin({ ip, from: placeOf(ip), remember });
     log("admin: logged in from", hashIp(ip), remember ? "(remembered)" : "");
     // an alert for every login, so one that wasn't you stands out
-    notifySecurity("Admin login", `Someone logged in to the admin from ${ip} (${placeOf(ip)})${remember ? ", remembered for 30 days" : ""}. Not you? Open the admin and press "log out everywhere".`)
+    notifySecurity("Admin login", `Someone logged in to the admin from ${ip} (${placeOf(ip)})${totpSecret ? " with token and code" : " with the token"}${remember ? ", remembered for 30 days" : ""}. Not you? Open the admin and press "log out everywhere".`)
         .catch((error) => log("ntfy:", error.message));
     return { ok: true };
 });
 
 route("POST", /^\/api\/admin\/logout$/, (req, res) => {
+    if (!fromAdminPage(req)) throw new HttpError(403, "Log out from the admin page.");
     endSession(req, res);
     return { ok: true };
 });
@@ -426,6 +451,7 @@ route("GET", /^\/api\/admin\/overview$/, (req, res, url) => {
             previousLogin: store.getLogins().slice(-2, -1)[0] || null,
             sessions: activeSessions(),
             idleMinutes: config.idleMinutes,
+            twoFactor: Boolean(totpSecret),
         },
     };
 });
@@ -527,9 +553,10 @@ route("PUT", /^\/api\/admin\/settings$/, async (req) => {
 
 /* ---------- server ---------- */
 
-function applyCors(req, res) {
+/* the public site may read the public routes; the admin routes only answer their own page */
+function applyCors(req, res, pathname) {
     const origin = req.headers.origin;
-    if (origin && config.allowedOrigins.includes(origin)) {
+    if (origin && config.allowedOrigins.includes(origin) && !pathname.startsWith("/api/admin/")) {
         res.setHeader("Access-Control-Allow-Origin", origin);
         res.setHeader("Access-Control-Allow-Credentials", "true");
         res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, If-None-Match");
@@ -540,6 +567,53 @@ function applyCors(req, res) {
     res.setHeader("Vary", "Origin");
 }
 
+/* ---------- the admin page ---------- */
+
+const totpSecret = config.adminTotpSecret ? base32Decode(config.adminTotpSecret) : null;
+
+const fileTypes = {
+    ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+    ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp", ".jpg": "image/jpeg",
+    ".ico": "image/x-icon", ".woff2": "font/woff2", ".json": "application/json",
+};
+// the page's own rules, as a header (a meta tag can't forbid framing): its own files, the game
+// font from Google, player heads from mc-heads.net, and calls only to this API
+const adminPagePolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    + "font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://mc-heads.net; connect-src 'self'; "
+    + "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+
+function sendPlain(res, status, text) {
+    res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end(text);
+}
+
+/* admin/index.html and admin/admin.js, and the site's styles, scripts, fonts and pictures they use.
+   only those folders, only known file types, nothing outside them (no "..") */
+function adminFile(relative) {
+    if (relative === "" || relative === "index.html") return path.join(config.pageDir, "admin", "index.html");
+    if (relative === "admin.js") return path.join(config.pageDir, "admin", "admin.js");
+    if (!/^(scripts|styles|fonts|images)(\/[\w.-]+)+$/.test(relative) || relative.includes("..")) return null;
+    const root = path.join(config.pageDir, "site");
+    const file = path.resolve(root, relative);
+    return file.startsWith(root + path.sep) ? file : null;
+}
+
+async function serveAdminPage(res, relative) {
+    const file = adminFile(relative);
+    const type = file && fileTypes[path.extname(file)];
+    if (!type) return sendPlain(res, 404, "Not found.");
+    try {
+        const body = await fs.promises.readFile(file);
+        res.setHeader("Content-Security-Policy", adminPagePolicy);
+        res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+        res.setHeader("Cache-Control", type.startsWith("text/html") ? "no-store" : "no-cache");
+        res.writeHead(200, { "Content-Type": type });
+        res.end(body);
+    } catch {
+        sendPlain(res, 404, "Not found.");
+    }
+}
+
 const server = http.createServer(async (req, res) => {
     // the API only answers with data: nothing may run it as a page, frame it or read the address it came from
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -547,14 +621,24 @@ const server = http.createServer(async (req, res) => {
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "no-referrer");
     res.setHeader("Cache-Control", "no-store");
-    applyCors(req, res);
+    const url = new URL(req.url, "http://localhost");
+    applyCors(req, res, url.pathname);
 
     if (req.method === "OPTIONS") {
         res.writeHead(204);
         return res.end();
     }
 
-    const url = new URL(req.url, "http://localhost");
+    // the admin page: only on the home network and the VPN; anywhere else it doesn't exist
+    if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
+        if (req.method !== "GET" || !fromAdminNetwork(req)) return sendPlain(res, 404, "Not found.");
+        if (url.pathname === "/admin") {
+            res.writeHead(301, { Location: "/admin/" });
+            return res.end();
+        }
+        return serveAdminPage(res, url.pathname.slice("/admin/".length));
+    }
+
     try {
         // the admin only answers on the home network and the VPN (ADMIN_NETWORKS)
         if (url.pathname.startsWith("/api/admin/") && !fromAdminNetwork(req)) {

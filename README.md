@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="https://join.errornoslash.be"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/link-join-dark.svg"><img src="assets/link-join-light.svg" alt="join" height="40"></picture></a>
-  <a href="https://join.errornoslash.be/admin.html"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/link-admin-dark.svg"><img src="assets/link-admin-light.svg" alt="admin" height="40"></picture></a>
+  <a href="https://mc-api.errornoslash.be/admin/"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/link-admin-dark.svg"><img src="assets/link-admin-light.svg" alt="admin" height="40"></picture></a>
   <a href="https://github.com/ErrorNoSlash/mc-site/actions/workflows/plugin.yml"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/link-plugin-dark.svg"><img src="assets/link-plugin-light.svg" alt="plugin" height="40"></picture></a>
   <a href="https://mc-api.errornoslash.be/api/status"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/link-status-dark.svg"><img src="assets/link-status-light.svg" alt="status.json" height="40"></picture></a>
 </p>
@@ -26,7 +26,7 @@
 ## 📌 Pages
 
 <p align="center">
-  <a href="https://join.errornoslash.be"><picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/page-join-m-dark.svg"><source media="(max-width: 600px)" srcset="assets/page-join-m-light.svg"><source media="(prefers-color-scheme: dark)" srcset="assets/page-join-dark.svg"><img src="assets/page-join-light.svg" alt="join.errornoslash.be — the status, and the form to ask to join" width="50%"></picture></a><a href="https://join.errornoslash.be/admin.html"><picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/page-admin-m-dark.svg"><source media="(max-width: 600px)" srcset="assets/page-admin-m-light.svg"><source media="(prefers-color-scheme: dark)" srcset="assets/page-admin-dark.svg"><img src="assets/page-admin-light.svg" alt="the admin page — approve, deny, switch the whitelist on" width="50%"></picture></a><br><a href="api/"><picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/page-api-m-dark.svg"><source media="(max-width: 600px)" srcset="assets/page-api-m-light.svg"><source media="(prefers-color-scheme: dark)" srcset="assets/page-api-dark.svg"><img src="assets/page-api-light.svg" alt="mc-api.errornoslash.be — server pings, requests, ntfy pushes" width="50%"></picture></a><a href="velocity-plugin/"><picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/page-plugin-m-dark.svg"><source media="(max-width: 600px)" srcset="assets/page-plugin-m-light.svg"><source media="(prefers-color-scheme: dark)" srcset="assets/page-plugin-dark.svg"><img src="assets/page-plugin-light.svg" alt="the Velocity plugin — checks every login at the proxy" width="50%"></picture></a>
+  <a href="https://join.errornoslash.be"><picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/page-join-m-dark.svg"><source media="(max-width: 600px)" srcset="assets/page-join-m-light.svg"><source media="(prefers-color-scheme: dark)" srcset="assets/page-join-dark.svg"><img src="assets/page-join-light.svg" alt="join.errornoslash.be — the status, and the form to ask to join" width="50%"></picture></a><a href="https://mc-api.errornoslash.be/admin/"><picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/page-admin-m-dark.svg"><source media="(max-width: 600px)" srcset="assets/page-admin-m-light.svg"><source media="(prefers-color-scheme: dark)" srcset="assets/page-admin-dark.svg"><img src="assets/page-admin-light.svg" alt="the admin page — approve, deny, switch the whitelist on" width="50%"></picture></a><br><a href="api/"><picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/page-api-m-dark.svg"><source media="(max-width: 600px)" srcset="assets/page-api-m-light.svg"><source media="(prefers-color-scheme: dark)" srcset="assets/page-api-dark.svg"><img src="assets/page-api-light.svg" alt="mc-api.errornoslash.be — server pings, requests, ntfy pushes" width="50%"></picture></a><a href="velocity-plugin/"><picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/page-plugin-m-dark.svg"><source media="(max-width: 600px)" srcset="assets/page-plugin-m-light.svg"><source media="(prefers-color-scheme: dark)" srcset="assets/page-plugin-dark.svg"><img src="assets/page-plugin-light.svg" alt="the Velocity plugin — checks every login at the proxy" width="50%"></picture></a>
 </p>
 
 ## 🧱 How it works
@@ -89,7 +89,7 @@ docker exec -it Ntfy ntfy access YOUR_USER mc-whitelist read-only    # so your p
 
 Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin page. If it fails, the admin page says why: `ENOTFOUND` means Ntfy isn't on the `mc-api` network, and `401/403` means the token or its access is wrong.
 
-**6. Turn it on.** Open [`join.errornoslash.be/admin.html`](https://join.errornoslash.be/admin.html), paste the token (`sops -d --extract '["WHITELIST_ADMIN_TOKEN"]' ~/nixos-config/secrets.yaml`), add yourself, let the regulars join once, press **add all**, then switch **OFF** to **ON**.
+**6. Turn it on.** Open [`mc-api.errornoslash.be/admin/`](https://mc-api.errornoslash.be/admin/) (home network or Tailscale only: anywhere else it doesn't exist), paste the token (`sops -d --extract '["WHITELIST_ADMIN_TOKEN"]' ~/nixos-config/secrets.yaml`), add yourself, let the regulars join once, press **add all**, then switch **OFF** to **ON**.
 
 **Deploy.** The site is served with GitHub Pages: **Settings → Pages → Source: GitHub Actions**, custom domain `join.errornoslash.be`, plus a DNS `CNAME` record (DNS only) pointing `join` at `errornoslash.github.io`. Every push to `site/` deploys it.
 
@@ -125,7 +125,7 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | **container**  | Node 26 LTS, unprivileged user, read-only filesystem, no Linux capabilities, a `noexec` `/tmp`, ¼ core, 256 MB and 64 processes at most |
 | **if the API were taken over** | it writes only its own folder; the plugin's `seen.tsv` and the archived list are mounted read-only, the worlds and the proxy's folder not at all; its network reaches only NPM, Ntfy and the game servers; its ntfy token can only post to `mc-whitelist` |
 | **plugin**     | treats the API's `whitelist.txt` as untrusted: size limits, every line checked, the kick message can only use colours and text styles (no clicks, links or hovers), the player's name can't add tags |
-| **admin**      | only from home or Tailscale; the token is swapped for an HttpOnly session cookie, never stored; a login ends after 30 min unused (7 days with remember) and after 12 h at most (30 days); every login and lockout is pushed to ntfy; 10 wrong tries lock an address out for 15 min, 30 from anywhere lock everyone out; the page shows the login before yours and can log out every device |
+| **admin**      | the page itself is served by the API and only exists on the home network and Tailscale (a 404 anywhere else); its calls are same-origin only, the public site can't make them; logging in takes the token **and** a 6-digit code from an authenticator app (`server/admin-2fa.fish`), a code works once; the token is swapped for an HttpOnly session cookie, never stored; a login ends after 30 min unused (7 days with remember) and after 12 h at most (30 days); every login and lockout is pushed to ntfy; 10 wrong tries lock an address out for 15 min, 30 from anywhere lock everyone out; the page shows the login before yours and can log out every device |
 | **site**       | https only, a strict Content-Security-Policy, API answers drawn as text (never HTML), the pages hide themselves inside someone else's frame |
 | **requests**   | Java names checked with Mojang, 3 an hour per address, a hidden field for bots        |
 | **whitelist**  | Java by UUID, Bedrock by Floodgate name (Java names can't contain the dot)            |
@@ -144,7 +144,9 @@ Subscribe to `mc-whitelist` in the ntfy app, then press **test** on the admin pa
 | `POST`   | `/api/requests` `{edition, name, note}`     | anyone           |
 | `GET`    | `/api/requests/lookup?edition=&name=`       | anyone           |
 | `POST`   | `/api/act/:id/approve\|deny?exp=&sig=`      | signed ntfy link |
-| `POST`   | `/api/admin/login` `{token, remember}`      | token → cookie   |
+| `GET`    | `/admin/`                                   | the admin page, home network / Tailscale only (404 elsewhere) |
+| `GET`    | `/api/admin/login`                          | whether a code is asked for |
+| `POST`   | `/api/admin/login` `{token, code, remember}` | token + code → cookie |
 | `POST`   | `/api/admin/logout`                         | session          |
 | `POST`   | `/api/admin/logout-everywhere`              | session / token  |
 | `GET`    | `/api/admin/overview` (`?auto=1` doesn't count as use) | session / token |
@@ -201,7 +203,8 @@ A server you only want off for a while: `mc-off anarchy back in december` ([`ser
 
 ```
 .
-├── site/                 # GitHub Pages: index.html, admin.html, scripts, styles, fonts
+├── site/                 # GitHub Pages: index.html, scripts, styles, fonts
+├── admin/                # the admin page, served by the API itself (only to ADMIN_NETWORKS)
 ├── api/                  # the whitelist API (Node 26, no dependencies) + Dockerfile
 ├── velocity-plugin/      # the DS Whitelist plugin (Velocity 4, Java 25)
 ├── server/               # your Minecraft compose with the API added
