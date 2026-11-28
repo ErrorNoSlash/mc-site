@@ -82,6 +82,12 @@ function remember(result) {
     } catch (storageOff) { }
 }
 
+// counts the event in umami: only the edition and the outcome, never a name or the note;
+// does nothing when the tracker is blocked or hasn't loaded
+function track(event, data) {
+    if (window.umami && typeof window.umami.track === "function") window.umami.track(event, data);
+}
+
 form.addEventListener("submit", async function (e) {
     e.preventDefault();
     const name = nameInput.value.trim();
@@ -119,6 +125,7 @@ form.addEventListener("submit", async function (e) {
             banner = toast("Advancement Made!", "On the list", "listed");
         }
         say(lines, banner ? "toast" : tone, banner);
+        track(checking ? "lookup" : "join-request", { edition: edition(), status: result.status || "error" });
         if (!checking) form.elements.note.value = "";
     } catch (error) {
         say([error.message.charAt(0).toLowerCase() + error.message.slice(1)], "error");

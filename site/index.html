@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <!-- security: only load scripts, styles, fonts and pictures from this site and the few places named here,
          always over https -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://mc-heads.net; connect-src 'self' https://mc-api.errornoslash.be; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://stats.errornoslash.be; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://mc-heads.net; connect-src 'self' https://mc-api.errornoslash.be https://stats.errornoslash.be; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>DS Network · Minecraft</title>
@@ -53,6 +53,8 @@
     <script src="scripts/request.js" defer></script>
     <script src="scripts/panorama.js" defer></script>
     <script src="scripts/popups.js" defer></script>
+    <!-- visitor counts (umami, no cookies); only counted on the real site, not when testing locally -->
+    <script defer src="https://stats.errornoslash.be/script.js" data-website-id="2da1b772-f4c9-4818-a765-d163aad559bd" data-domains="join.errornoslash.be"></script>
 </head>
 
 <body class="fit">
