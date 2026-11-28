@@ -10,8 +10,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>DS Network · Minecraft</title>
     <meta name="description" content="DS Network, a small whitelisted Minecraft server for Java and Bedrock. See if it's online and ask to join.">
-    <meta name="theme-color" content="#e4e4e4" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#040507" media="(prefers-color-scheme: dark)">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#040507">
 
     <link rel="canonical" href="https://join.errornoslash.be/">
 
@@ -55,6 +55,7 @@
     <script src="scripts/request.js" defer></script>
     <script src="scripts/panorama.js" defer></script>
     <script src="scripts/popups.js" defer></script>
+    <script src="scripts/theme.js" defer></script>
     <!-- visitor counts (umami, no cookies); only counted on the real site, not when testing locally -->
     <script defer src="https://stats.errornoslash.be/script.js" data-website-id="2da1b772-f4c9-4818-a765-d163aad559bd" data-domains="join.errornoslash.be"></script>
 </head>
@@ -87,6 +88,7 @@
             <nav class="cell nav-tabs" aria-label="Sections">
                 <a class="pill" href="#servers">status?</a>
                 <a class="pill" href="#join">join?</a>
+                <button class="pill theme-toggle" type="button" data-to-light="light?" data-to-dark="dark?" data-title-light="Light mode" data-title-dark="Dark mode"></button>
             </nav>
         </div>
 

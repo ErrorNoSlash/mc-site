@@ -10,8 +10,8 @@
     <title>DS Network · admin</title>
     <meta name="robots" content="noindex, nofollow">
     <meta name="referrer" content="no-referrer">
-    <meta name="theme-color" content="#e4e4e4" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#040507" media="(prefers-color-scheme: dark)">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#040507">
 
     <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 
@@ -31,6 +31,7 @@
     <script src="scripts/common.js" defer></script>
     <script src="scripts/cursor.js" defer></script>
     <script src="scripts/panorama.js" defer></script>
+    <script src="scripts/theme.js" defer></script>
     <script src="admin.js" defer></script>
 </head>
 
@@ -47,6 +48,7 @@
             <nav class="cell nav-tabs" aria-label="Admin">
                 <a class="pill" href="https://join.errornoslash.be/">site</a>
                 <button class="pill" type="button" id="logout" hidden>log out</button>
+                <button class="pill theme-toggle" type="button" data-to-light="light?" data-to-dark="dark?" data-title-light="Light mode" data-title-dark="Dark mode"></button>
             </nav>
         </div>
 

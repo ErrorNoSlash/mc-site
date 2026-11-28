@@ -149,7 +149,7 @@ function texture(block, face, u, v) {
 
 /* tracing */
 
-let isNight = false;
+let isNight = true;
 
 function skyValue(dz, yaw) {
     const elevation = Math.asin(Math.max(-1, Math.min(1, dz)));
@@ -237,12 +237,13 @@ function readColors() {
     const style = getComputedStyle(document.documentElement);
     const background = parseColor(style.getPropertyValue("--background"));
     const foreground = parseColor(style.getPropertyValue("--foreground"));
+    // dark mode (the default) is a night sky, light mode a day sky
+    isNight = document.documentElement.dataset.theme !== "light";
     palette = [];
     for (let level = 0; level < shadeLevels; level++) {
         const amount = level / (shadeLevels - 1) * maxStrength;
         palette.push(background.map(function (channel, c) { return Math.round(channel + (foreground[c] - channel) * amount); }));
     }
-    isNight = window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
 /* hidden (the admin page once you're logged in): nothing is drawn, and a draw that was going stops.
@@ -340,7 +341,7 @@ function scheduleRedraw() {
 }
 if ("ResizeObserver" in window) new ResizeObserver(scheduleRedraw).observe(panorama.parentElement);
 window.addEventListener("resize", scheduleRedraw);
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawPanorama);
+window.addEventListener("themechange", drawPanorama);
 
 // the turning itself is a CSS animation; pause it when the row is off screen
 // it stops turning when scrolled away or behind a popup

@@ -21,15 +21,17 @@
     font-display: swap;
 }
 
-/* COLORS (same as the contact site) */
+/* COLORS (same as the contact site): dark by default, light when picked with the toggle */
 :root {
     --black: #040507;
 
-    /* light theme (default) */
-    --background: #e4e4e4;
-    --foreground: #1a1a1a;
-    --surface: #f6f6f6;
-    --line-color: #6f6f6f;
+    --background: var(--black);
+    --foreground: #ececec;
+    --surface: #1c1c1c;
+    --line-color: #8a8a8a;
+
+    /* form fields, scrollbars and the like follow the theme too */
+    color-scheme: dark;
 
     --line-width: 0.0625rem;
 
@@ -42,18 +44,17 @@
     --font-pixel: "Monocraft", ui-monospace, monospace;
 
     /* a faint block texture behind the sheet */
-    --texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cg fill='%23000' fill-opacity='.05'%3E%3Crect x='1' y='1' width='2' height='1'/%3E%3Crect x='5' y='2' width='1' height='2'/%3E%3Crect x='2' y='5' width='1' height='1'/%3E%3Crect x='6' y='6' width='2' height='1'/%3E%3Crect x='0' y='3' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E");
+    --texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cg fill='%23fff' fill-opacity='.035'%3E%3Crect x='1' y='1' width='2' height='1'/%3E%3Crect x='5' y='2' width='1' height='2'/%3E%3Crect x='2' y='5' width='1' height='1'/%3E%3Crect x='6' y='6' width='2' height='1'/%3E%3Crect x='0' y='3' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E");
 }
 
-/* dark theme: follows the system */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --background: var(--black);
-        --foreground: #ececec;
-        --surface: #1c1c1c;
-        --line-color: #8a8a8a;
-        --texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cg fill='%23fff' fill-opacity='.035'%3E%3Crect x='1' y='1' width='2' height='1'/%3E%3Crect x='5' y='2' width='1' height='2'/%3E%3Crect x='2' y='5' width='1' height='1'/%3E%3Crect x='6' y='6' width='2' height='1'/%3E%3Crect x='0' y='3' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E");
-    }
+/* light theme: only when picked with the toggle in the nav (theme.js) */
+:root[data-theme="light"] {
+    --background: #e4e4e4;
+    --foreground: #1a1a1a;
+    --surface: #f6f6f6;
+    --line-color: #6f6f6f;
+    --texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cg fill='%23000' fill-opacity='.05'%3E%3Crect x='1' y='1' width='2' height='1'/%3E%3Crect x='5' y='2' width='1' height='2'/%3E%3Crect x='2' y='5' width='1' height='1'/%3E%3Crect x='6' y='6' width='2' height='1'/%3E%3Crect x='0' y='3' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E");
+    color-scheme: light;
 }
 
 /* every element counts padding and border inside its width */
@@ -3095,4 +3096,24 @@ body.fit {
     body.fit :is(.marquee, .hotbar-row) {
         display: none;
     }
+}
+
+/* the light / dark toggle in the nav: a pill like the others, its word says what it switches to.
+   it only shows once the script is there (firstPaint.js adds can-theme) */
+.theme-toggle {
+    display: none;
+}
+
+:root.can-theme .nav-tabs .pill.theme-toggle {
+    display: inline-flex;
+}
+
+/* the word comes from the button's data attributes, so it is right before any script runs */
+.theme-toggle::after {
+    content: attr(data-to-light);
+}
+
+/* in light mode it offers dark */
+:root[data-theme="light"] .theme-toggle::after {
+    content: attr(data-to-dark);
 }
